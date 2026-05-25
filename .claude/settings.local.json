@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Programming\\\\2 WIP\\\\TPT School\\\\tpt-school\\\\src\\\\app\\\\\\(dashboard\\)\\\\\" -Directory | Select-Object -ExpandProperty Name)"
+    ]
+  }
+}

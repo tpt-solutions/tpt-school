@@ -1,0 +1,70 @@
+{
+  "name": "tpt-school-desktop",
+  "version": "0.1.0",
+  "description": "TPT School — Desktop Installer",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:web": "cd .. && npm run build",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist": "electron-builder --win --mac"
+  },
+  "dependencies": {
+    "electron-serve": "^2.1.1"
+  },
+  "devDependencies": {
+    "electron": "^36.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "nz.school.tpt",
+    "productName": "TPT School",
+    "copyright": "Copyright © 2026 TPT School",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "!node_modules/.cache"
+    ],
+    "extraResources": [
+      {
+        "from": "..",
+        "to": "app",
+        "filter": [
+          "**/*",
+          "!.next/cache",
+          "!node_modules/.cache",
+          "!*.md",
+          "!.git"
+        ]
+      }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build-resources/icon.ico"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "category": "public.app-category.education",
+      "icon": "build-resources/icon.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "dmg": {
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    }
+  }
+}
