@@ -12,7 +12,7 @@ interface PageProps {
 }
 
 export default async function TakeRollPage({ params }: PageProps) {
-  await requireRole(['admin', 'teacher'])
+  const session = await requireRole(['admin', 'teacher'])
   const { classId } = await params
 
   const cls = await db.class.findUnique({
@@ -40,6 +40,12 @@ export default async function TakeRollPage({ params }: PageProps) {
       studentId: { in: cls.enrolments.map((e: { studentId: string }) => e.studentId) },
       date: { gte: today, lte: todayEnd },
     },
+  })
+
+  // Fetch current term for offline queue
+  const currentTerm = await db.term.findFirst({
+    where: { startDate: { lte: new Date() }, endDate: { gte: new Date() } },
+    orderBy: { startDate: 'desc' },
   })
 
   type AttRec = { studentId: string; status: string; notes: string | null }
@@ -85,7 +91,7 @@ export default async function TakeRollPage({ params }: PageProps) {
         </div>
       </div>
 
-      <RollForm classId={classId} students={students} />
+      <RollForm classId={classId} students={students} termId={currentTerm?.id ?? ''} markedById={session.id} />
     </div>
   )
 }

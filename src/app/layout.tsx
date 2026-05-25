@@ -16,6 +16,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'TPT School',
   description: 'School Management Platform',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'TPT School',
+  },
+  formatDetection: { telephone: false },
 }
 
 export default function RootLayout({

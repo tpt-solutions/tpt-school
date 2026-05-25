@@ -7,11 +7,12 @@ import SmtpForm from './smtp-form'
 import EmailProviderForm from './email-provider-form'
 import AiForm from './ai-form'
 import AuditLogView from './audit-log'
+import RoomsForm from './rooms-form'
 
 export default async function SettingsPage() {
   const user = await requireRole(['admin'])
 
-  const [settings, academicYears, recentAuditLogs] = await Promise.all([
+  const [settings, academicYears, recentAuditLogs, rooms] = await Promise.all([
     db.schoolSettings.findFirst(),
     db.academicYear.findMany({
       include: { terms: { orderBy: { termNumber: 'asc' } } },
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
       orderBy: { createdAt: 'desc' },
       take: 100,
     }),
+    db.room.findMany({ orderBy: { name: 'asc' } }),
   ])
 
   const schoolSettings = {
@@ -58,6 +60,7 @@ export default async function SettingsPage() {
           <TabsTrigger value="smtp">SMTP</TabsTrigger>
           <TabsTrigger value="email-provider">Email Provider</TabsTrigger>
           <TabsTrigger value="ai">AI Integration</TabsTrigger>
+          <TabsTrigger value="rooms">Rooms</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
         </TabsList>
 
@@ -87,6 +90,10 @@ export default async function SettingsPage() {
             aiBaseUrl={settings?.aiBaseUrl ?? null}
             aiReportMode={settings?.aiReportMode ?? 'assist'}
           />
+        </TabsContent>
+
+        <TabsContent value="rooms" className="mt-6 max-w-3xl">
+          <RoomsForm rooms={rooms} />
         </TabsContent>
 
         <TabsContent value="audit" className="mt-6">

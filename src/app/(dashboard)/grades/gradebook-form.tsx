@@ -166,6 +166,21 @@ export default function GradebookForm({ classes, terms, defaultClassId }: Gradeb
         </div>
       </div>
 
+      {/* Document URL */}
+      <div className="space-y-2">
+        <Label htmlFor="documentUrl">Assignment Document URL</Label>
+        <Input
+          id="documentUrl"
+          name="documentUrl"
+          type="url"
+          placeholder="https://docs.google.com/… or OneDrive link, or any URL"
+        />
+        <p className="text-xs text-slate-400">
+          Paste a link to the assignment brief — Google Docs, OneDrive, or any URL.
+          Students will see this link on their Assignments page.
+        </p>
+      </div>
+
       {/* Description */}
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>

@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { GraduationCap, CalendarCheck, Award, Bell, DollarSign } from 'lucide-react'
+import { GraduationCap, CalendarCheck, Award, Bell, DollarSign, ClipboardList } from 'lucide-react'
 
 function StatCard({
   title,
@@ -213,7 +213,7 @@ export default async function PortalPage() {
     )
   }
 
-  const [totalDays, presentDays, recentGrades, myClasses, noticeCount] = await Promise.all([
+  const [totalDays, presentDays, recentGrades, myClasses, pendingAssignments] = await Promise.all([
     db.attendance.count({ where: { studentId: student.id } }),
     db.attendance.count({ where: { studentId: student.id, status: 'present' } }),
     db.grade.findMany({
@@ -223,12 +223,15 @@ export default async function PortalPage() {
       take: 5,
     }),
     db.classEnrolment.count({ where: { studentId: student.id, status: 'active' } }),
-    db.notice.count({
+    db.gradebook.count({
       where: {
-        AND: [
-          { OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
-          { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
-        ],
+        dueDate: { gte: now },
+        class: {
+          enrolments: { some: { studentId: student.id, status: 'active' } },
+        },
+        grades: {
+          none: { studentId: student.id, submittedAt: { not: null } },
+        },
       },
     }),
   ])
@@ -282,11 +285,11 @@ export default async function PortalPage() {
             color="bg-violet-100 text-violet-600"
           />
           <StatCard
-            title="Notices"
-            value={noticeCount}
-            description="School notices"
-            icon={Bell}
-            color="bg-amber-100 text-amber-600"
+            title="Assignments Due"
+            value={pendingAssignments}
+            description="Pending submission"
+            icon={ClipboardList}
+            color={pendingAssignments > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}
           />
         </div>
       </div>
@@ -314,6 +317,9 @@ export default async function PortalPage() {
       )}
 
       <div className="flex gap-3 flex-wrap">
+        <Link href="/assignments" className="text-sm text-primary font-medium hover:underline">
+          Submit assignments →
+        </Link>
         <Link href="/portal/notices" className="text-sm text-primary font-medium hover:underline">
           View notices →
         </Link>

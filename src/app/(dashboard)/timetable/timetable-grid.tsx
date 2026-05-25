@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,7 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createSlotAction, updateSlotAction, deleteSlotAction } from './actions'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, AlertTriangle } from 'lucide-react'
+import BulkWizard from './bulk-wizard'
+import type { TimetableConflict } from '@/lib/timetable-conflicts'
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -63,6 +65,7 @@ interface TimetableGridProps {
   rooms: RoomOption[]
   staff: StaffOption[]
   isAdmin: boolean
+  conflicts?: TimetableConflict[]
 }
 
 interface EditState {
@@ -77,7 +80,7 @@ interface EditState {
   notes: string
 }
 
-export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin }: TimetableGridProps) {
+export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin, conflicts = [] }: TimetableGridProps) {
   const [editState, setEditState] = useState<EditState | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -85,6 +88,12 @@ export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin }:
   const slotMap = new Map<string, Slot>()
   for (const slot of slots) {
     slotMap.set(`${slot.dayOfWeek}-${slot.period}`, slot)
+  }
+
+  // Build a set of day-period keys that have at least one conflict
+  const conflictCells = new Set<string>()
+  for (const c of conflicts) {
+    conflictCells.add(`${c.day}-${c.period}`)
   }
 
   function openNew(day: number, period: number) {
@@ -155,6 +164,39 @@ export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin }:
 
   return (
     <>
+      {isAdmin && (
+        <div className="flex justify-end mb-4">
+          <BulkWizard
+            classes={classes}
+            rooms={rooms}
+            staff={staff}
+            existingSlots={slots}
+          />
+        </div>
+      )}
+
+      {/* Conflict summary */}
+      {conflicts.length > 0 && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+            <span className="text-sm font-semibold text-red-700">
+              {conflicts.length} scheduling conflict{conflicts.length > 1 ? 's' : ''} detected
+            </span>
+          </div>
+          <ul className="space-y-1">
+            {conflicts.map((c, i) => (
+              <li key={i} className="text-xs text-red-600 flex items-start gap-2">
+                <span className="shrink-0 mt-0.5 rounded px-1 py-0.5 bg-red-100 text-red-500 font-medium uppercase tracking-wide text-[10px]">
+                  {c.type === 'teacher-clash' ? 'Staff' : 'Room'}
+                </span>
+                {c.description}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Grid */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
         <div className="grid grid-cols-6 min-w-[640px]">
@@ -173,10 +215,9 @@ export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin }:
 
           {/* Period rows */}
           {PERIODS.map((period) => (
-            <>
+            <React.Fragment key={period}>
               {/* Period label */}
               <div
-                key={`label-${period}`}
                 className="border-b border-r border-slate-100 p-3 bg-slate-50 text-center last:border-b-0"
               >
                 <div className="text-sm font-semibold text-slate-700">P{period}</div>
@@ -186,8 +227,9 @@ export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin }:
               </div>
 
               {/* Day cells */}
-              {[1, 2, 3, 4, 5].map((day, dayIdx) => {
+              {([1, 2, 3, 4, 5] as const).map((day, dayIdx) => {
                 const slot = slotMap.get(`${day}-${period}`)
+                const hasConflict = conflictCells.has(`${day}-${period}`)
                 return (
                   <div
                     key={`${day}-${period}`}
@@ -195,13 +237,16 @@ export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin }:
                     onClick={() => slot ? openEdit(slot) : openNew(day, period)}
                   >
                     {slot ? (
-                      <div className="h-full rounded-lg bg-primary/10 border border-primary/20 p-2 text-xs">
-                        <div className="font-semibold text-primary truncate">{slot.class.name}</div>
+                      <div className={`h-full rounded-lg p-2 text-xs ${hasConflict ? 'bg-red-50 border border-red-300' : 'bg-primary/10 border border-primary/20'}`}>
+                        <div className={`font-semibold truncate flex items-center gap-1 ${hasConflict ? 'text-red-700' : 'text-primary'}`}>
+                          {hasConflict && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                          {slot.class.name}
+                        </div>
                         {slot.room && (
-                          <div className="text-slate-500 font-mono mt-0.5">{slot.room.code}</div>
+                          <div className={`font-mono mt-0.5 ${hasConflict ? 'text-red-500' : 'text-slate-500'}`}>{slot.room.code}</div>
                         )}
                         {slot.staff && (
-                          <div className="text-slate-400 truncate mt-0.5">{slot.staff.user.name}</div>
+                          <div className={`truncate mt-0.5 ${hasConflict ? 'text-red-400' : 'text-slate-400'}`}>{slot.staff.user.name}</div>
                         )}
                       </div>
                     ) : isAdmin ? (
@@ -212,7 +257,7 @@ export default function TimetableGrid({ slots, classes, rooms, staff, isAdmin }:
                   </div>
                 )
               })}
-            </>
+            </React.Fragment>
           ))}
         </div>
       </div>

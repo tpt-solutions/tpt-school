@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { saveAttendanceAction } from '../../actions'
-import { CheckCircle2, XCircle, Clock, BookOpen } from 'lucide-react'
+import { enqueue, getPending, dequeue } from '@/lib/attendance-queue'
+import { CheckCircle2, XCircle, Clock, BookOpen, WifiOff, RefreshCw } from 'lucide-react'
 
 type StudentRecord = {
   studentId: string
@@ -17,6 +18,8 @@ type StudentRecord = {
 interface RollFormProps {
   classId: string
   students: StudentRecord[]
+  termId: string
+  markedById: string
 }
 
 type StatusValue = 'present' | 'absent' | 'late' | 'excused'
@@ -28,7 +31,7 @@ const STATUS_OPTIONS: { value: StatusValue; label: string; color: string; active
   { value: 'excused', label: 'Excused', color: 'border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700', activeColor: 'border-blue-500 bg-blue-50 text-blue-700' },
 ]
 
-export default function RollForm({ classId, students }: RollFormProps) {
+export default function RollForm({ classId, students, termId, markedById }: RollFormProps) {
   const [statuses, setStatuses] = useState<Record<string, StatusValue>>(
     Object.fromEntries(
       students.map((s) => [s.studentId, (s.existingStatus as StatusValue) ?? 'present'])
@@ -41,7 +44,49 @@ export default function RollForm({ classId, students }: RollFormProps) {
   )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [savedOffline, setSavedOffline] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+
+  // Load initial pending count
+  useEffect(() => {
+    getPending().then(p => setPendingCount(p.length))
+  }, [])
+
+  const flushQueue = useCallback(async () => {
+    const pending = await getPending()
+    if (pending.length === 0) return
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/sync-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pending),
+      })
+      if (res.ok) {
+        const data: { savedIds: string[] } = await res.json()
+        await Promise.all(data.savedIds.map(dequeue))
+        const remaining = await getPending()
+        setPendingCount(remaining.length)
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }, [])
+
+  // Online/offline listeners + auto-flush on reconnect
+  useEffect(() => {
+    const goOnline = () => { setIsOnline(true); flushQueue() }
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [flushQueue])
 
   function setAll(status: StatusValue) {
     setStatuses(Object.fromEntries(students.map((s) => [s.studentId, status])))
@@ -52,12 +97,36 @@ export default function RollForm({ classId, students }: RollFormProps) {
     setSaving(true)
     setError(null)
     setSaved(false)
+    setSavedOffline(false)
 
     const records = students.map((s) => ({
       studentId: s.studentId,
       status: statuses[s.studentId] ?? 'present',
       notes: notes[s.studentId] || undefined,
     }))
+
+    if (!isOnline) {
+      // Queue for later sync
+      const queued = records.map(r => ({
+        id: crypto.randomUUID(),
+        studentId: r.studentId,
+        classId,
+        termId,
+        date: new Date().toISOString(),
+        status: r.status,
+        notes: r.notes,
+        markedById,
+        queuedAt: Date.now(),
+      }))
+      await Promise.all(queued.map(enqueue))
+      const pending = await getPending()
+      setPendingCount(pending.length)
+      setSavedOffline(true)
+      setSaved(true)
+      setSaving(false)
+      setTimeout(() => setSaved(false), 4000)
+      return
+    }
 
     const result = await saveAttendanceAction(classId, records)
     setSaving(false)
@@ -87,6 +156,29 @@ export default function RollForm({ classId, students }: RollFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+          <WifiOff className="w-4 h-4 shrink-0" />
+          You are offline. Attendance will be saved to this device and synced automatically when you reconnect.
+        </div>
+      )}
+
+      {/* Pending sync banner */}
+      {isOnline && pendingCount > 0 && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+          <RefreshCw className={`w-4 h-4 shrink-0 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing
+            ? `Syncing ${pendingCount} queued record(s)…`
+            : `${pendingCount} queued record(s) pending sync.`}
+          {!syncing && (
+            <button type="button" onClick={flushQueue} className="underline ml-1 font-medium">
+              Sync now
+            </button>
+          )}
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
           {error}
@@ -96,7 +188,9 @@ export default function RollForm({ classId, students }: RollFormProps) {
       {saved && (
         <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
-          Attendance saved successfully
+          {savedOffline
+            ? 'Saved locally — will sync when you reconnect.'
+            : 'Attendance saved successfully'}
         </div>
       )}
 
@@ -165,7 +259,7 @@ export default function RollForm({ classId, students }: RollFormProps) {
 
       <div className="sticky bottom-4">
         <Button type="submit" disabled={saving} className="w-full sm:w-auto shadow-lg">
-          {saving ? 'Saving...' : 'Save Attendance'}
+          {saving ? 'Saving…' : isOnline ? 'Save Attendance' : 'Save Offline'}
         </Button>
       </div>
     </form>

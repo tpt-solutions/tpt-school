@@ -30,8 +30,13 @@ import {
   Users,
   ArrowDownLeft,
   Download,
+  StickyNote,
+  LayoutGrid,
 } from 'lucide-react'
 import TransferInPanel from './transfer-in-panel'
+import GuardianPanel from './guardian-panel'
+import StudentNotes from './student-notes'
+import StudentTimetable from './student-timetable'
 
 type Params = Promise<{ id: string }>
 
@@ -76,12 +81,103 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
         orderBy: { uploadedAt: 'desc' },
       },
       transferIn: true,
+      notes: {
+        include: { author: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+      },
     },
   })
 
   if (!student) notFound()
 
   const statusInfo = STATUS_LABELS[student.enrollmentStatus] ?? { label: student.enrollmentStatus, variant: 'outline' as const }
+
+  // Parent engagement scoring (admin only)
+  type EngagementData = {
+    userId: string
+    name: string
+    loginActivity: 'active' | 'passive' | 'inactive' | 'never'
+    noticeReadRate: number | null
+    paymentPunctuality: number | null
+    level: 'high' | 'medium' | 'low'
+  }
+  let parentEngagement: EngagementData[] = []
+  if (session.role === 'admin' && student.parents.length > 0) {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+    const now = new Date()
+    const parentUserIds = student.parents.map(p => p.parent.userId)
+
+    const [recentNoticeCount, paidInvoices, reads] = await Promise.all([
+      db.notice.count({
+        where: {
+          publishedAt: { not: null, gte: thirtyDaysAgo, lte: now },
+          OR: [{ targetRoles: 'all' }, { targetRoles: { contains: 'parent' } }],
+        },
+      }),
+      db.feeInvoice.findMany({
+        where: { studentId: student.id, status: 'paid' },
+        include: { payments: { orderBy: { paidAt: 'asc' }, take: 1 } },
+      }),
+      db.noticeRead.findMany({
+        where: {
+          userId: { in: parentUserIds },
+          notice: { publishedAt: { not: null, gte: thirtyDaysAgo } },
+        },
+        select: { userId: true },
+      }),
+    ])
+
+    const readCounts = new Map<string, number>()
+    for (const r of reads) readCounts.set(r.userId, (readCounts.get(r.userId) ?? 0) + 1)
+
+    const totalPaid = paidInvoices.length
+    const onTimePaid = paidInvoices.filter(inv => {
+      const fp = inv.payments[0]
+      return fp && new Date(fp.paidAt) <= new Date(inv.dueDate)
+    }).length
+    const punctuality = totalPaid > 0 ? Math.round((onTimePaid / totalPaid) * 100) : null
+
+    parentEngagement = student.parents.map(({ parent }) => {
+      const lastLogin = (parent.user as { lastLoginAt?: Date | null }).lastLoginAt ?? null
+      const loginActivity: EngagementData['loginActivity'] =
+        !lastLogin ? 'never' :
+        lastLogin > fourteenDaysAgo ? 'active' :
+        lastLogin > sixtyDaysAgo ? 'passive' : 'inactive'
+
+      const readsCount = readCounts.get(parent.userId) ?? 0
+      const noticeReadRate = recentNoticeCount > 0
+        ? Math.round((readsCount / recentNoticeCount) * 100)
+        : null
+
+      let good = 0
+      if (loginActivity === 'active') good++
+      if (noticeReadRate != null && noticeReadRate >= 50) good++
+      if (punctuality != null && punctuality >= 80) good++
+
+      return {
+        userId: parent.userId,
+        name: parent.user.name,
+        loginActivity,
+        noticeReadRate,
+        paymentPunctuality: punctuality,
+        level: good >= 2 ? 'high' : good === 1 ? 'medium' : 'low',
+      }
+    })
+  }
+
+  const timetableSlots = await db.timetableSlot.findMany({
+    where: {
+      class: { enrolments: { some: { studentId: student.id, status: 'active' } } },
+    },
+    include: { class: { select: { name: true } }, room: { select: { code: true } } },
+    orderBy: [{ dayOfWeek: 'asc' }, { period: 'asc' }],
+  })
+
+  const visibleNotes = session.role === 'admin'
+    ? student.notes
+    : student.notes.filter((n) => !n.private)
 
   const totalAttendance = student.attendance.length
   const presentCount = student.attendance.filter((a) => a.status === 'present').length
@@ -173,6 +269,14 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
             <CalendarCheck className="w-4 h-4" />
             Attendance
           </TabsTrigger>
+          <TabsTrigger value="notes">
+            <StickyNote className="w-4 h-4" />
+            Notes
+          </TabsTrigger>
+          <TabsTrigger value="timetable">
+            <LayoutGrid className="w-4 h-4" />
+            Timetable
+          </TabsTrigger>
           <TabsTrigger value="transfer">
             <ArrowDownLeft className="w-4 h-4" />
             Transfer In
@@ -239,33 +343,50 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
         </TabsContent>
 
         {/* Guardians Tab */}
-        <TabsContent value="guardians" className="mt-4">
-          {student.parents.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm">
-              No guardians or parents linked to this student yet.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {student.parents.map(({ parent, isPrimary }) => (
-                <Card key={parent.id} className="border-slate-200 shadow-sm">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{parent.user.name}</CardTitle>
-                      {isPrimary && <Badge variant="default">Primary</Badge>}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <dl>
-                      <DetailRow label="Email" value={parent.user.email} />
-                      <DetailRow label="Phone" value={parent.user.phone} />
-                      <DetailRow label="Relationship" value={parent.relationship} />
-                      <DetailRow label="Occupation" value={parent.occupation} />
-                      <DetailRow label="Work Phone" value={parent.workPhone} />
-                    </dl>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+        <TabsContent value="guardians" className="mt-4 space-y-6">
+          <GuardianPanel
+            studentId={student.id}
+            guardians={student.parents}
+            isAdmin={session.role === 'admin'}
+          />
+          {session.role === 'admin' && parentEngagement.length > 0 && (
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Guardian Engagement</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y divide-slate-100">
+                  {parentEngagement.map(p => {
+                    const levelColors: Record<string, string> = {
+                      high: 'bg-green-100 text-green-700',
+                      medium: 'bg-amber-100 text-amber-700',
+                      low: 'bg-red-100 text-red-700',
+                    }
+                    const loginLabels: Record<string, string> = {
+                      active: 'Active (14d)',
+                      passive: 'Passive (60d)',
+                      inactive: 'Inactive (60d+)',
+                      never: 'Never logged in',
+                    }
+                    return (
+                      <div key={p.userId} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-slate-900">{p.name}</span>
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full capitalize ${levelColors[p.level]}`}>
+                            {p.level} engagement
+                          </span>
+                        </div>
+                        <div className="flex gap-3 text-xs text-slate-500 flex-wrap">
+                          <span>Login: <strong className="text-slate-700">{loginLabels[p.loginActivity]}</strong></span>
+                          <span>Notices: <strong className="text-slate-700">{p.noticeReadRate != null ? `${p.noticeReadRate}%` : 'n/a'}</strong></span>
+                          <span>On-time fees: <strong className="text-slate-700">{p.paymentPunctuality != null ? `${p.paymentPunctuality}%` : 'n/a'}</strong></span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
@@ -442,6 +563,21 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
             )}
           </div>
         </TabsContent>
+        {/* Notes Tab */}
+        <TabsContent value="notes" className="mt-4">
+          <StudentNotes
+            studentId={student.id}
+            notes={visibleNotes}
+            currentUserId={session.id}
+            isAdmin={session.role === 'admin'}
+          />
+        </TabsContent>
+
+        {/* Timetable Tab */}
+        <TabsContent value="timetable" className="mt-4">
+          <StudentTimetable slots={timetableSlots} />
+        </TabsContent>
+
         {/* Transfer In Tab */}
         <TabsContent value="transfer" className="mt-4">
           <TransferInPanel

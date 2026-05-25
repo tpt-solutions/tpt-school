@@ -1,7 +1,7 @@
 import { requireRole } from '@/lib/auth'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, ClipboardCheck, DollarSign, BarChart2, FileText } from 'lucide-react'
+import { Users, ClipboardCheck, DollarSign, BarChart2, FileText, HeartHandshake } from 'lucide-react'
 
 const REPORT_CARDS = [
   {
@@ -38,6 +38,13 @@ const REPORT_CARDS = [
     href: '/reports/enrolment',
     icon: Users,
     color: 'bg-emerald-100 text-emerald-600',
+  },
+  {
+    title: 'Parent Engagement',
+    description: 'See which parents are actively logging in, reading notices, and paying on time.',
+    href: '/reports/parent-engagement',
+    icon: HeartHandshake,
+    color: 'bg-pink-100 text-pink-600',
   },
 ]
 

@@ -1,7 +1,10 @@
 import { requireRole } from '@/lib/auth'
 import { db } from '@/lib/db'
 import TimetableGrid from './timetable-grid'
+import ScheduleGenerator from './schedule-generator'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Calendar } from 'lucide-react'
+import { detectConflicts } from '@/lib/timetable-conflicts'
 
 export default async function TimetablePage() {
   const user = await requireRole(['admin', 'teacher'])
@@ -28,8 +31,8 @@ export default async function TimetablePage() {
     orderBy: [{ dayOfWeek: 'asc' }, { period: 'asc' }],
   })
 
-  // For the editor dialog (admin only)
-  const [classes, rooms, staff] = isAdmin
+  // For the editor dialog and auto-scheduler (admin only)
+  const [classes, rooms, staff, requirements] = isAdmin
     ? await Promise.all([
         db.class.findMany({
           where: { academicYearId: activeYear?.id },
@@ -37,8 +40,18 @@ export default async function TimetablePage() {
         }),
         db.room.findMany({ orderBy: { name: 'asc' } }),
         db.staff.findMany({ include: { user: true }, orderBy: { user: { name: 'asc' } } }),
+        db.timetableRequirement.findMany({
+          include: {
+            class: true,
+            staff: { include: { user: true } },
+            preferredRoom: true,
+          },
+          orderBy: { class: { name: 'asc' } },
+        }),
       ])
-    : [[], [], []]
+    : [[], [], [], []]
+
+  const conflicts = isAdmin ? detectConflicts(slots) : []
 
   return (
     <div className="space-y-6">
@@ -64,13 +77,41 @@ export default async function TimetablePage() {
         </div>
       )}
 
-      <TimetableGrid
-        slots={slots}
-        classes={classes}
-        rooms={rooms}
-        staff={staff}
-        isAdmin={isAdmin}
-      />
+      {isAdmin ? (
+        <Tabs defaultValue="manual">
+          <TabsList>
+            <TabsTrigger value="manual">Manual</TabsTrigger>
+            <TabsTrigger value="auto">Auto-Scheduler</TabsTrigger>
+          </TabsList>
+          <TabsContent value="manual" className="pt-4">
+            <TimetableGrid
+              slots={slots}
+              classes={classes}
+              rooms={rooms}
+              staff={staff}
+              isAdmin={isAdmin}
+              conflicts={conflicts}
+            />
+          </TabsContent>
+          <TabsContent value="auto" className="pt-4">
+            <ScheduleGenerator
+              requirements={requirements}
+              classes={classes}
+              rooms={rooms}
+              staff={staff}
+            />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <TimetableGrid
+          slots={slots}
+          classes={classes}
+          rooms={rooms}
+          staff={staff}
+          isAdmin={isAdmin}
+          conflicts={conflicts}
+        />
+      )}
     </div>
   )
 }

@@ -247,6 +247,48 @@ export async function recordTransferInAction(
   }
 }
 
+// ─── Suggested Placement ─────────────────────────────────────────────────────
+
+export async function getSuggestedClassesAction(studentId: string) {
+  await requireRole(['admin'])
+
+  const student = await db.student.findUnique({ where: { id: studentId }, select: { yearLevel: true } })
+  if (!student?.yearLevel) return []
+
+  const activeYear = await db.academicYear.findFirst({ where: { active: true } })
+  if (!activeYear) return []
+
+  const classes = await db.class.findMany({
+    where: {
+      academicYearId: activeYear.id,
+      yearLevel: student.yearLevel,
+      enrolments: { none: { studentId, status: 'active' } },
+    },
+    include: {
+      room: { select: { code: true } },
+      teachers: {
+        where: { isPrimary: true },
+        include: { staff: { include: { user: { select: { name: true } } } } },
+        take: 1,
+      },
+      _count: { select: { enrolments: true } },
+    },
+    orderBy: { subject: 'asc' },
+  })
+
+  return classes
+    .filter(c => c.maxStudents === null || c._count.enrolments < c.maxStudents)
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      subject: c.subject ?? '',
+      teacherName: c.teachers[0]?.staff.user.name ?? null,
+      roomCode: c.room?.code ?? null,
+      enrolled: c._count.enrolments,
+      maxStudents: c.maxStudents,
+    }))
+}
+
 // ─── Search ──────────────────────────────────────────────────────────────────
 
 export async function searchStudentsAction(

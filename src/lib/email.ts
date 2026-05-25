@@ -239,6 +239,31 @@ export function reportCardEmailHtml(
   `
 }
 
+export function feeReminderEmailHtml(
+  parentName: string,
+  studentName: string,
+  invoiceId: string,
+  outstandingAmount: number,
+  dueDate: Date,
+  currencySymbol: string,
+  schoolName: string,
+): string {
+  const overdueDays = Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+  return `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+      <h2 style="color:#dc2626">${schoolName} — Fee Payment Reminder</h2>
+      <p>Hi ${parentName},</p>
+      <p>This is a reminder that an outstanding fee invoice for <strong>${studentName}</strong> is overdue.</p>
+      <table style="border-collapse:collapse;margin:16px 0">
+        <tr><td style="padding:4px 8px;font-weight:bold">Invoice ID:</td><td style="padding:4px 8px">${invoiceId.slice(0, 8).toUpperCase()}</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:bold">Outstanding:</td><td style="padding:4px 8px;color:#dc2626;font-weight:bold">${currencySymbol}${outstandingAmount.toFixed(2)}</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:bold">Due Date:</td><td style="padding:4px 8px">${dueDate.toLocaleDateString()}${overdueDays > 0 ? ` (${overdueDays} day${overdueDays > 1 ? 's' : ''} overdue)` : ''}</td></tr>
+      </table>
+      <p>Please contact the school office to arrange payment at your earliest convenience.</p>
+    </div>
+  `
+}
+
 export function leaveDecisionEmailHtml(
   staffName: string,
   status: string,

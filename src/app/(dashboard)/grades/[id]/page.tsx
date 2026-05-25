@@ -2,8 +2,9 @@ import { requireRole } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Download } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { buttonVariants } from '@/components/ui/button'
 import GradeEntry from './grade-entry'
 import { format } from 'date-fns'
 
@@ -41,20 +42,44 @@ export default async function GradebookDetailPage({ params }: PageProps) {
 
   if (!gradebook) notFound()
 
-  type GradeRec = { score: number | null; grade: string | null; comment: string | null }
+  type GradeRec = {
+    id: string
+    score: number | null
+    grade: string | null
+    comment: string | null
+    submittedAt: Date | null
+    submissionUrl: string | null
+    gradedAt: Date | null
+  }
   const gradeMap = new Map<string, GradeRec>(gradebook.grades.map((g) => [g.studentId, g as GradeRec]))
 
-  const students = gradebook.class.enrolments.map((enrolment) => {
+  const rawStudents = gradebook.class.enrolments.map((enrolment) => {
     const existing = gradeMap.get(enrolment.student.id)
     return {
       studentId: enrolment.student.id,
       name: enrolment.student.user.name,
       studentCode: enrolment.student.studentId,
-      existingScore: existing?.score,
-      existingGrade: existing?.grade,
-      existingComment: existing?.comment,
+      existingScore: existing?.score ?? null,
+      existingGrade: existing?.grade ?? null,
+      existingComment: existing?.comment ?? null,
+      submittedAt: existing?.submittedAt ?? null,
+      submissionUrl: existing?.submissionUrl ?? null,
+      gradedAt: existing?.gradedAt ?? null,
     }
   })
+
+  // Sort: submitted-ungraded first, then pending, then graded
+  const students = rawStudents.sort((a, b) => {
+    const rank = (s: typeof a) => {
+      if (s.submittedAt && !s.gradedAt) return 0  // needs marking
+      if (!s.submittedAt && !s.gradedAt) return 1  // not submitted
+      return 2                                       // graded
+    }
+    return rank(a) - rank(b)
+  })
+
+  const submittedCount = rawStudents.filter((s) => s.submittedAt).length
+  const ungradedSubmissions = rawStudents.filter((s) => s.submittedAt && !s.gradedAt).length
 
   // Stats
   const gradedScores = gradebook.grades
@@ -91,9 +116,34 @@ export default async function GradebookDetailPage({ params }: PageProps) {
               <Badge variant="outline">Due: {format(new Date(gradebook.dueDate), 'dd MMM yyyy')}</Badge>
             )}
             <Badge variant="outline">Max: {gradebook.maxScore}</Badge>
+            {gradebook.documentUrl && (
+              <a
+                href={gradebook.documentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Assignment Doc
+              </a>
+            )}
+            <a
+              href={`/api/export/gradebook/${gradebook.id}`}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              <Download className="w-3.5 h-3.5" /> Export .xlsx
+            </a>
           </div>
         </div>
       </div>
+
+      {/* Submission banner */}
+      {submittedCount > 0 && (
+        <div className={`rounded-xl px-4 py-3 text-sm border ${ungradedSubmissions > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-green-50 border-green-200 text-green-800'}`}>
+          {ungradedSubmissions > 0
+            ? `${ungradedSubmissions} submission${ungradedSubmissions !== 1 ? 's' : ''} waiting to be marked · ${submittedCount} of ${students.length} students have submitted`
+            : `All ${submittedCount} submission${submittedCount !== 1 ? 's' : ''} have been marked`}
+        </div>
+      )}
 
       {/* Stats */}
       {gradedScores.length > 0 && (
@@ -124,6 +174,7 @@ export default async function GradebookDetailPage({ params }: PageProps) {
         maxScore={gradebook.maxScore}
         students={students}
       />
+
     </div>
   )
 }

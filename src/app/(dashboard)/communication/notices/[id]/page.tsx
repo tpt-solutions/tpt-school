@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft, Pin } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { format } from 'date-fns'
+import { NoticeReadTracker } from './notice-read-tracker'
 
 const CATEGORY_COLORS: Record<string, string> = {
   general: 'bg-slate-100 text-slate-700',
@@ -18,7 +19,7 @@ export default async function NoticeDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requireSession()
+  const user = await requireSession()
   const { id } = await params
 
   const notice = await db.notice.findUnique({
@@ -30,6 +31,7 @@ export default async function NoticeDetailPage({
 
   return (
     <div className="max-w-3xl space-y-6">
+      <NoticeReadTracker noticeId={id} />
       <div>
         <Link
           href="/communication"

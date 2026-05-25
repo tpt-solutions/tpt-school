@@ -32,7 +32,12 @@ npx prisma studio             # Browse database
 - `DATABASE_URL` lives in `prisma.config.ts` (`datasource.url`), NOT in `schema.prisma`
 - Generator: `provider = "prisma-client"` (not `prisma-client-js`)
 - Client generated at `src/generated/prisma/client.ts`, imported as `@/generated/prisma/client`
-- Constructor: `new (PrismaClient as any)()` — Prisma 7 types require `adapter`/`accelerateUrl` but runtime reads `DATABASE_URL` env
+- Requires a driver adapter — `new PrismaClient()` with no args throws at runtime. Use `PrismaBetterSqlite3` from `@prisma/adapter-better-sqlite3`:
+  ```ts
+  const adapter = new PrismaBetterSqlite3({ url: resolvedDbPath })
+  new (PrismaClient as any)({ adapter }) as PrismaClient
+  ```
+  See `src/lib/db.ts` for the full singleton setup.
 
 **shadcn v4 / Base UI:**
 - `asChild` prop does NOT exist on `Button` — use `buttonVariants` instead:
@@ -91,4 +96,4 @@ Each module follows the same pattern:
 - `tsconfig.json` has `"noImplicitAny": false` to suppress Prisma 7 callback inference issues while keeping all other strict checks
 
 ### Database
-SQLite at `prisma/dev.db` (development). WAL mode. Schema at `prisma/schema.prisma`. Prisma 7 `datasource db` block has NO `url` field — that's in `prisma.config.ts`.
+SQLite at `./dev.db` (project root, per `DATABASE_URL=file:./dev.db` in `.env`). Schema at `prisma/schema.prisma`. Prisma 7 `datasource db` block has NO `url` field — that's in `prisma.config.ts`. The `db.ts` singleton resolves the path at startup using `process.cwd()`.

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -70,6 +71,12 @@ export default function LoginForm() {
           {error}
         </div>
       )}
+
+      <div className="flex justify-end -mt-1">
+        <Link href="/forgot-password" className="text-xs text-slate-500 hover:text-slate-700 hover:underline">
+          Forgot password?
+        </Link>
+      </div>
 
       <Button
         type="submit"

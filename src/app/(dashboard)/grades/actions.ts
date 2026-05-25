@@ -16,6 +16,7 @@ export async function createGradebookAction(formData: FormData) {
   const weight = formData.get('weight') ? Number(formData.get('weight')) : 1
   const dueDateStr = formData.get('dueDate') as string
   const description = formData.get('description') as string
+  const documentUrl = (formData.get('documentUrl') as string)?.trim() || null
 
   if (!name || !classId || !termId) {
     return { error: 'Name, class, and term are required' }
@@ -40,6 +41,7 @@ export async function createGradebookAction(formData: FormData) {
         weight,
         dueDate: dueDateStr ? new Date(dueDateStr) : null,
         description: description || null,
+        documentUrl,
       },
     })
 

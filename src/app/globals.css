@@ -2,6 +2,24 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* ─── Global readability overrides ──────────────────────────────────────────
+   Shift the slate colour band one step darker so every hardcoded
+   border-slate-100 / border-slate-200 / divide-slate-50 across the app
+   becomes clearly visible without touching 45+ component files.
+   Also bump up font sizes for comfortable reading at any age.
+────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Slate colours — each step shifted one band darker */
+  --color-slate-50:  oklch(0.968 0.007 264.54);   /* old slate-100 */
+  --color-slate-100: oklch(0.929 0.013 264.54);   /* old slate-200 */
+  --color-slate-200: oklch(0.869 0.022 264.54);   /* old slate-300 */
+
+  /* Font sizes — bumped for readability */
+  --text-xs:   0.8125rem;   /* 13px  (was 12px) */
+  --text-sm:   0.9375rem;   /* 15px  (was 14px) */
+  --text-base: 1.0625rem;   /* 17px  (was 16px) */
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -64,9 +82,9 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.70 0 0);
+  --input: oklch(0.70 0 0);
+  --ring: oklch(0.45 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -123,6 +141,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    line-height: 1.65;
   }
   html {
     @apply font-sans;

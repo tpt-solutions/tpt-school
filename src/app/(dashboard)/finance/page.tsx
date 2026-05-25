@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, DollarSign, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import { format } from 'date-fns'
+import FeeReminderButton from './fee-reminder-button'
 
 const STATUS_STYLES: Record<string, string> = {
   unpaid: 'bg-yellow-100 text-yellow-700',
@@ -62,17 +63,20 @@ export default async function FinancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Finance</h1>
           <p className="text-sm text-slate-500 mt-0.5">Invoices, payments, and fee management</p>
         </div>
-        <Link href="/finance/invoices/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Invoice
-          </Button>
-        </Link>
+        <div className="flex items-start gap-3 flex-wrap justify-end">
+          <FeeReminderButton />
+          <Link href="/finance/invoices/new">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              New Invoice
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Overview Cards */}

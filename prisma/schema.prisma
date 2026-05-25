@@ -21,15 +21,21 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  sessions         Session[]
-  staffProfile     Staff?
-  studentProfile   Student?
-  parentProfile    Parent?
-  sentMessages     Message[]        @relation("SentMessages")
-  receivedMessages MessageRecipient[]
-  notices          Notice[]
-  auditLogs        AuditLog[]
-  schoolEvents     SchoolEvent[]
+  lastLoginAt          DateTime?
+
+  sessions             Session[]
+  staffProfile         Staff?
+  studentProfile       Student?
+  parentProfile        Parent?
+  sentMessages         Message[]           @relation("SentMessages")
+  receivedMessages     MessageRecipient[]
+  notices              Notice[]
+  noticeReads          NoticeRead[]
+  auditLogs            AuditLog[]
+  schoolEvents         SchoolEvent[]
+  authoredNotes        StudentNote[]
+  createdEnrolRequests EnrolmentRequest[]  @relation("RequestedBy")
+  reviewedEnrolRequests EnrolmentRequest[] @relation("ReviewedBy")
 }
 
 model Session {
@@ -129,11 +135,12 @@ model Staff {
   bio            String?
   qualifications String?
 
-  user           User              @relation(fields: [userId], references: [id])
-  classes        ClassTeacher[]
-  timetableSlots TimetableSlot[]
-  leaveRequests  LeaveRequest[]
-  attendance     StaffAttendance[]
+  user                    User                  @relation(fields: [userId], references: [id])
+  classes                 ClassTeacher[]
+  timetableSlots          TimetableSlot[]
+  timetableRequirements   TimetableRequirement[]
+  leaveRequests           LeaveRequest[]
+  attendance              StaffAttendance[]
 }
 
 model LeaveRequest {
@@ -199,6 +206,9 @@ model Student {
   behaviourIncidents  BehaviourIncident[]
   suspensions         Suspension[]
   truancyAlerts       TruancyAlert[]
+  notes               StudentNote[]
+  waitlistEntries     WaitlistEntry[]
+  enrolmentRequests   EnrolmentRequest[]
 }
 
 model Parent {
@@ -231,6 +241,52 @@ model Document {
   student    Student  @relation(fields: [studentId], references: [id])
 }
 
+model StudentNote {
+  id        String   @id @default(cuid())
+  studentId String
+  authorId  String
+  content   String
+  type      String   @default("general") // general | academic | medical | behaviour | pastoral
+  private   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  student   Student  @relation(fields: [studentId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  classId   String
+  studentId String
+  position  Int
+  addedAt   DateTime @default(now())
+  notes     String?
+  class     Class    @relation(fields: [classId], references: [id])
+  student   Student  @relation(fields: [studentId], references: [id])
+
+  @@unique([classId, studentId])
+}
+
+model EnrolmentRequest {
+  id               String    @id @default(cuid())
+  classId          String
+  studentId        String
+  requestedById    String
+  message          String?
+  status           String    @default("pending") // pending | approved | rejected
+  reviewedById     String?
+  reviewedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  class            Class     @relation(fields: [classId], references: [id])
+  student          Student   @relation(fields: [studentId], references: [id])
+  requestedBy      User      @relation("RequestedBy", fields: [requestedById], references: [id])
+  reviewedBy       User?     @relation("ReviewedBy", fields: [reviewedById], references: [id])
+
+  @@unique([classId, studentId])
+}
+
 // ─── Classes & Timetabling ───────────────────────────────────────────────────
 
 model Class {
@@ -243,12 +299,17 @@ model Class {
   roomId         String?
   maxStudents    Int?
   description    String?
-  academicYear   AcademicYear   @relation(fields: [academicYearId], references: [id])
-  room           Room?          @relation(fields: [roomId], references: [id])
-  teachers       ClassTeacher[]
-  enrolments     ClassEnrolment[]
-  timetableSlots TimetableSlot[]
-  gradebooks     Gradebook[]
+  periodsPerWeek Int            @default(5)
+
+  academicYear      AcademicYear       @relation(fields: [academicYearId], references: [id])
+  room              Room?              @relation(fields: [roomId], references: [id])
+  teachers          ClassTeacher[]
+  enrolments        ClassEnrolment[]
+  timetableSlots    TimetableSlot[]
+  gradebooks        Gradebook[]
+  waitlistEntries   WaitlistEntry[]
+  enrolmentRequests EnrolmentRequest[]
+  timetableRequirements TimetableRequirement[]
 
   @@unique([academicYearId, code])
 }
@@ -284,8 +345,9 @@ model Room {
   building String?
   floor    String?
 
-  classes        Class[]
-  timetableSlots TimetableSlot[]
+  classes                  Class[]
+  timetableSlots           TimetableSlot[]
+  timetableRequirements    TimetableRequirement[]
 }
 
 model TimetableSlot {
@@ -301,6 +363,22 @@ model TimetableSlot {
   class     Class   @relation(fields: [classId], references: [id])
   staff     Staff?  @relation(fields: [staffId], references: [id])
   room      Room?   @relation(fields: [roomId], references: [id])
+}
+
+// ─── Timetable Requirements (for auto-scheduling) ────────────────────────────
+
+model TimetableRequirement {
+  id              String  @id @default(cuid())
+  classId         String
+  staffId         String?
+  preferredRoomId String?
+  periodsPerWeek  Int
+  label           String?  // e.g. "Math with Mr Smith"
+  class           Class   @relation(fields: [classId], references: [id])
+  staff           Staff?  @relation(fields: [staffId], references: [id])
+  preferredRoom   Room?   @relation(fields: [preferredRoomId], references: [id])
+
+  @@unique([classId, staffId])
 }
 
 // ─── Attendance ──────────────────────────────────────────────────────────────
@@ -332,6 +410,7 @@ model Gradebook {
   weight      Float     @default(1)
   dueDate     DateTime?
   type        String    @default("assessment")
+  documentUrl String?
   class       Class     @relation(fields: [classId], references: [id])
   term        Term      @relation(fields: [termId], references: [id])
   grades      Grade[]
@@ -344,9 +423,10 @@ model Grade {
   score       Float?
   grade       String?
   comment     String?
-  submittedAt DateTime?
-  gradedAt    DateTime?
-  gradedById  String?
+  submittedAt   DateTime?
+  submissionUrl String?
+  gradedAt      DateTime?
+  gradedById    String?
   gradebook   Gradebook @relation(fields: [gradebookId], references: [id])
   student     Student   @relation(fields: [studentId], references: [id])
 
@@ -385,7 +465,18 @@ model Notice {
   pinned      Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  author      User      @relation(fields: [authorId], references: [id])
+  author      User       @relation(fields: [authorId], references: [id])
+  reads       NoticeRead[]
+}
+
+model NoticeRead {
+  noticeId  String
+  userId    String
+  readAt    DateTime @default(now())
+  notice    Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([noticeId, userId])
 }
 
 model Message {
@@ -441,6 +532,7 @@ model FeeInvoice {
   notes       String?
   totalAmount Float
   paidAmount  Float            @default(0)
+  lastReminderSentAt DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   student     Student          @relation(fields: [studentId], references: [id])

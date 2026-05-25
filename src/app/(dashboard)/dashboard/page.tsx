@@ -1,6 +1,7 @@
 import { requireSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Link from 'next/link'
 import {
   GraduationCap,
   Users,
@@ -10,6 +11,7 @@ import {
   Award,
   CalendarCheck,
   FileWarning,
+  AlertTriangle,
 } from 'lucide-react'
 
 async function getAdminStats() {
@@ -45,6 +47,101 @@ async function getTeacherStats(userId: string) {
     todayAttendance: 0, // placeholder
     pendingGrades,
   }
+}
+
+type RiskFlag = 'attendance' | 'behaviour' | 'grades'
+type AtRiskStudent = { id: string; name: string; yearLevel: number | null; flags: RiskFlag[] }
+
+async function getAtRiskStudents(studentIdFilter?: string[]): Promise<AtRiskStudent[]> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const students = await db.student.findMany({
+    where: {
+      enrollmentStatus: 'active',
+      ...(studentIdFilter ? { id: { in: studentIdFilter } } : {}),
+    },
+    select: {
+      id: true,
+      yearLevel: true,
+      user: { select: { name: true } },
+      attendance: {
+        where: { date: { gte: thirtyDaysAgo } },
+        select: { status: true },
+      },
+      behaviourIncidents: {
+        where: { date: { gte: thirtyDaysAgo } },
+        select: { id: true },
+        take: 1,
+      },
+      grades: {
+        where: { score: { not: null } },
+        orderBy: { gradedAt: 'desc' },
+        take: 3,
+        select: { score: true },
+      },
+    },
+  })
+
+  const atRisk: AtRiskStudent[] = []
+  for (const s of students) {
+    const flags: RiskFlag[] = []
+    const total = s.attendance.length
+    if (total >= 5) {
+      const present = s.attendance.filter(a => a.status === 'present').length
+      if (present / total < 0.8) flags.push('attendance')
+    }
+    if (s.behaviourIncidents.length > 0) flags.push('behaviour')
+    const scores = s.grades.map(g => g.score as number)
+    if (scores.length === 3 && scores[2] > scores[1] && scores[1] > scores[0]) flags.push('grades')
+    if (flags.length >= 2) atRisk.push({ id: s.id, name: s.user.name, yearLevel: s.yearLevel, flags })
+  }
+  atRisk.sort((a, b) => b.flags.length - a.flags.length || a.name.localeCompare(b.name))
+  return atRisk.slice(0, 10)
+}
+
+const FLAG_LABELS: Record<RiskFlag, { label: string; className: string }> = {
+  attendance: { label: 'Low Attendance', className: 'bg-orange-100 text-orange-700' },
+  behaviour:  { label: 'Recent Incident', className: 'bg-red-100 text-red-700' },
+  grades:     { label: 'Declining Grades', className: 'bg-amber-100 text-amber-700' },
+}
+
+function AtRiskWidget({ students }: { students: AtRiskStudent[] }) {
+  if (students.length === 0) return null
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <AlertTriangle className="w-5 h-5 text-amber-500" />
+        At-Risk Students
+      </h2>
+      <Card className="border-slate-100 shadow-sm">
+        <CardContent className="p-0">
+          <div className="divide-y divide-slate-100">
+            {students.map(s => (
+              <div key={s.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Link
+                    href={`/students/${s.id}`}
+                    className="text-sm font-medium text-slate-900 hover:text-primary hover:underline truncate"
+                  >
+                    {s.name}
+                  </Link>
+                  {s.yearLevel != null && (
+                    <span className="text-xs text-slate-400 shrink-0">Yr {s.yearLevel}</span>
+                  )}
+                </div>
+                <div className="flex gap-1.5 flex-wrap justify-end shrink-0 ml-3">
+                  {s.flags.map(f => (
+                    <span key={f} className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${FLAG_LABELS[f].className}`}>
+                      {FLAG_LABELS[f].label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 type StatCardProps = {
@@ -84,7 +181,7 @@ export default async function DashboardPage() {
     'Good evening'
 
   if (user.role === 'admin') {
-    const stats = await getAdminStats()
+    const [stats, atRiskStudents] = await Promise.all([getAdminStats(), getAtRiskStudents()])
     return (
       <div className="space-y-8">
         {/* Welcome banner */}
@@ -129,6 +226,9 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* At-risk widget */}
+        <AtRiskWidget students={atRiskStudents} />
+
         {/* Quick links */}
         <div>
           <h2 className="text-lg font-semibold text-slate-800 mb-4">Quick Actions</h2>
@@ -157,7 +257,19 @@ export default async function DashboardPage() {
   }
 
   if (user.role === 'teacher') {
-    const stats = await getTeacherStats(user.id)
+    const staff = await db.staff.findUnique({ where: { userId: user.id } })
+    const [stats, myStudentIds] = await Promise.all([
+      getTeacherStats(user.id),
+      staff
+        ? db.classEnrolment
+            .findMany({
+              where: { status: 'active', class: { teachers: { some: { staffId: staff.id } } } },
+              select: { studentId: true },
+            })
+            .then(es => [...new Set(es.map(e => e.studentId))])
+        : Promise.resolve([] as string[]),
+    ])
+    const atRiskStudents = await getAtRiskStudents(myStudentIds)
     return (
       <div className="space-y-8">
         <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-violet-500 text-white p-6 md:p-8 shadow-lg">
@@ -199,6 +311,8 @@ export default async function DashboardPage() {
             />
           </div>
         </div>
+
+        <AtRiskWidget students={atRiskStudents} />
       </div>
     )
   }

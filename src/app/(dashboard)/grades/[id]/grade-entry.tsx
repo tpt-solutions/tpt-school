@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { saveGradesAction } from '../actions'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Clock } from 'lucide-react'
 
 type StudentRow = {
   studentId: string
@@ -14,6 +14,9 @@ type StudentRow = {
   existingScore?: number | null
   existingGrade?: string | null
   existingComment?: string | null
+  submittedAt?: Date | null
+  submissionUrl?: string | null
+  gradedAt?: Date | null
 }
 
 interface GradeEntryProps {
@@ -135,10 +138,31 @@ export default function GradeEntry({ gradebookId, maxScore, students }: GradeEnt
               const pct = !isNaN(scoreNum) && scoreVal !== '' ? Math.round((scoreNum / maxScore) * 100) : null
 
               return (
-                <tr key={student.studentId} className="hover:bg-slate-50">
+                <tr
+                  key={student.studentId}
+                  className={student.submittedAt && !student.gradedAt ? 'bg-amber-50/40 hover:bg-amber-50' : 'hover:bg-slate-50'}
+                >
                   <td className="px-6 py-3">
                     <p className="font-medium text-slate-800">{student.name}</p>
                     <p className="text-xs text-slate-400 font-mono">{student.studentCode}</p>
+                    {student.submittedAt && (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                          <Clock className="w-3 h-3" />
+                          Submitted {new Date(student.submittedAt).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+                        </span>
+                        {student.submissionUrl && (
+                          <a
+                            href={student.submissionUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary flex items-center gap-0.5 hover:underline"
+                          >
+                            <ExternalLink className="w-3 h-3" /> Open
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

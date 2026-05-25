@@ -5,6 +5,77 @@ import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt, isEncrypted } from '@/lib/crypto'
 
+// ─── Rooms ────────────────────────────────────────────────────────────────────
+
+export async function createRoomAction(
+  formData: FormData,
+): Promise<{ success: boolean; error?: string }> {
+  await requireRole(['admin'])
+  const name = (formData.get('name') as string)?.trim()
+  const code = (formData.get('code') as string)?.trim().toUpperCase()
+  const type = (formData.get('type') as string)?.trim() || null
+  const building = (formData.get('building') as string)?.trim() || null
+  const floor = (formData.get('floor') as string)?.trim() || null
+  const capacityRaw = formData.get('capacity') as string
+  const capacity = capacityRaw ? parseInt(capacityRaw, 10) : null
+
+  if (!name || !code) return { success: false, error: 'Name and code are required.' }
+
+  const existing = await db.room.findFirst({ where: { OR: [{ name }, { code }] } })
+  if (existing) return { success: false, error: 'A room with that name or code already exists.' }
+
+  try {
+    await db.room.create({ data: { name, code, type, building, floor, capacity } })
+    revalidatePath('/settings')
+    revalidatePath('/timetable')
+    return { success: true }
+  } catch {
+    return { success: false, error: 'An unexpected error occurred.' }
+  }
+}
+
+export async function updateRoomAction(
+  id: string,
+  formData: FormData,
+): Promise<{ success: boolean; error?: string }> {
+  await requireRole(['admin'])
+  const name = (formData.get('name') as string)?.trim()
+  const code = (formData.get('code') as string)?.trim().toUpperCase()
+  const type = (formData.get('type') as string)?.trim() || null
+  const building = (formData.get('building') as string)?.trim() || null
+  const floor = (formData.get('floor') as string)?.trim() || null
+  const capacityRaw = formData.get('capacity') as string
+  const capacity = capacityRaw ? parseInt(capacityRaw, 10) : null
+
+  if (!name || !code) return { success: false, error: 'Name and code are required.' }
+
+  const dup = await db.room.findFirst({ where: { OR: [{ name }, { code }], NOT: { id } } })
+  if (dup) return { success: false, error: 'Another room with that name or code exists.' }
+
+  try {
+    await db.room.update({ where: { id }, data: { name, code, type, building, floor, capacity } })
+    revalidatePath('/settings')
+    revalidatePath('/timetable')
+    return { success: true }
+  } catch {
+    return { success: false, error: 'An unexpected error occurred.' }
+  }
+}
+
+export async function deleteRoomAction(
+  id: string,
+): Promise<{ success: boolean; error?: string }> {
+  await requireRole(['admin'])
+  try {
+    await db.room.delete({ where: { id } })
+    revalidatePath('/settings')
+    revalidatePath('/timetable')
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Cannot delete a room that is assigned to classes or timetable slots.' }
+  }
+}
+
 // ─── School Settings ──────────────────────────────────────────────────────────
 
 export async function updateSchoolSettingsAction(
@@ -154,6 +225,40 @@ export async function createTermAction(
     return { success: true }
   } catch (err) {
     console.error('createTermAction error:', err)
+    return { success: false, error: 'An unexpected error occurred.' }
+  }
+}
+
+export async function updateTermAction(
+  termId: string,
+  formData: FormData,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireRole(['admin'])
+
+    const name = (formData.get('name') as string)?.trim()
+    const startDateRaw = formData.get('startDate') as string
+    const endDateRaw = formData.get('endDate') as string
+
+    if (!name || !startDateRaw || !endDateRaw) {
+      return { success: false, error: 'All term fields are required.' }
+    }
+
+    const startDate = new Date(startDateRaw)
+    const endDate = new Date(endDateRaw)
+    if (endDate <= startDate) {
+      return { success: false, error: 'End date must be after start date.' }
+    }
+
+    await db.term.update({
+      where: { id: termId },
+      data: { name, startDate, endDate },
+    })
+
+    revalidatePath('/settings')
+    return { success: true }
+  } catch (err) {
+    console.error('updateTermAction error:', err)
     return { success: false, error: 'An unexpected error occurred.' }
   }
 }

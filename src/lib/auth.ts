@@ -128,6 +128,7 @@ export async function signIn(
 
   const token = await createSession(user.id);
   await setSessionCookie(token);
+  db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
   return { success: true };
 }
 

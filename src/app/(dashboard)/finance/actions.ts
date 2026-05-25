@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendEmail, invoiceEmailHtml } from '@/lib/email'
+import { runFeeReminders } from '@/app/api/cron/fee-reminders/route'
 
 // ─── Fee Types ────────────────────────────────────────────────────────────────
 
@@ -217,6 +218,25 @@ export async function recordPaymentAction(
     return { success: true }
   } catch (err: unknown) {
     console.error('recordPaymentAction error:', err)
+    return { success: false, error: 'An unexpected error occurred.' }
+  }
+}
+
+// ─── Fee Reminders ────────────────────────────────────────────────────────────
+
+export async function triggerFeeRemindersAction(): Promise<{
+  success: boolean
+  sent?: number
+  skipped?: number
+  errors?: number
+  error?: string
+}> {
+  try {
+    await requireRole(['admin'])
+    const result = await runFeeReminders()
+    return { success: true, ...result }
+  } catch (err: unknown) {
+    console.error('triggerFeeRemindersAction error:', err)
     return { success: false, error: 'An unexpected error occurred.' }
   }
 }

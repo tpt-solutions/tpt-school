@@ -25,12 +25,19 @@ export default async function AttendancePage() {
 
   if (user.role === 'admin') {
     // Admin: show today's attendance summary
-    const [present, absent, late, excused, totalActive] = await Promise.all([
+    const [present, absent, late, excused, totalActive, allClasses] = await Promise.all([
       db.attendance.count({ where: { date: { gte: today, lte: todayEnd }, status: 'present' } }),
       db.attendance.count({ where: { date: { gte: today, lte: todayEnd }, status: 'absent' } }),
       db.attendance.count({ where: { date: { gte: today, lte: todayEnd }, status: 'late' } }),
       db.attendance.count({ where: { date: { gte: today, lte: todayEnd }, status: 'excused' } }),
       db.student.count({ where: { enrollmentStatus: 'active' } }),
+      db.class.findMany({
+        include: {
+          room: true,
+          _count: { select: { enrolments: { where: { status: 'active' } } } },
+        },
+        orderBy: [{ yearLevel: 'asc' }, { name: 'asc' }],
+      }),
     ])
 
     const totalMarked = present + absent + late + excused
@@ -120,6 +127,41 @@ export default async function AttendancePage() {
                   <Badge className={STATUS_COLORS[rec.status] + ' border-0 capitalize'}>
                     {rec.status}
                   </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Take Roll — all classes */}
+        <div>
+          <h2 className="font-semibold text-slate-800 mb-3">Take Roll</h2>
+          {allClasses.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
+              <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p>No classes found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allClasses.map((cls) => (
+                <div key={cls.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-800">{cls.name}</h3>
+                      <p className="text-xs text-slate-500 font-mono">{cls.code}</p>
+                    </div>
+                    {cls.yearLevel && (
+                      <Badge variant="secondary">Year {cls.yearLevel}</Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-slate-500 mb-4">
+                    <span>{cls._count.enrolments} students</span>
+                    {cls.room && <span> · {cls.room.code}</span>}
+                  </div>
+                  <Link href={`/attendance/roll/${cls.id}`} className={cn(buttonVariants(), 'w-full')}>
+                    <ClipboardCheck className="w-4 h-4 mr-2" />
+                    Take Roll
+                  </Link>
                 </div>
               ))}
             </div>

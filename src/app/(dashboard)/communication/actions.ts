@@ -107,3 +107,16 @@ export async function markMessageReadAction(messageId: string): Promise<void> {
     console.error('markMessageReadAction error:', err)
   }
 }
+
+export async function recordNoticeReadAction(noticeId: string): Promise<void> {
+  try {
+    const user = await requireSession()
+    await db.noticeRead.upsert({
+      where: { noticeId_userId: { noticeId, userId: user.id } },
+      create: { noticeId, userId: user.id },
+      update: {},
+    })
+  } catch (err) {
+    console.error('recordNoticeReadAction error:', err)
+  }
+}
