@@ -11,9 +11,10 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs'
-import { ChevronLeft, Pencil, User, CalendarDays } from 'lucide-react'
+import { ChevronLeft, Pencil, User, CalendarDays, MessageCircle } from 'lucide-react'
 import { LeaveApproveButton, LeaveDeclineButton } from './leave-actions'
 import LeaveRequestForm from './leave-request-form'
+import AllowRepliesToggle from './allow-replies-toggle'
 
 type Params = Promise<{ id: string }>
 
@@ -217,6 +218,15 @@ export default async function StaffDetailPage({ params }: { params: Params }) {
                 </CardContent>
               </Card>
             )}
+            <Card className="border-slate-200 shadow-sm lg:col-span-2">
+              <CardHeader className="pb-2 flex flex-row items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-slate-500" />
+                <CardTitle className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Messaging</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AllowRepliesToggle staffId={staff.id} value={staff.allowParentReplies} />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

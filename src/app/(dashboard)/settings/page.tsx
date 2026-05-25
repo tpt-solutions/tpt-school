@@ -8,6 +8,7 @@ import EmailProviderForm from './email-provider-form'
 import AiForm from './ai-form'
 import AuditLogView from './audit-log'
 import RoomsForm from './rooms-form'
+import MessagingForm from './messaging-form'
 
 export default async function SettingsPage() {
   const user = await requireRole(['admin'])
@@ -61,6 +62,7 @@ export default async function SettingsPage() {
           <TabsTrigger value="email-provider">Email Provider</TabsTrigger>
           <TabsTrigger value="ai">AI Integration</TabsTrigger>
           <TabsTrigger value="rooms">Rooms</TabsTrigger>
+          <TabsTrigger value="messaging">Messaging</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
         </TabsList>
 
@@ -94,6 +96,10 @@ export default async function SettingsPage() {
 
         <TabsContent value="rooms" className="mt-6 max-w-3xl">
           <RoomsForm rooms={rooms} />
+        </TabsContent>
+
+        <TabsContent value="messaging" className="mt-6 max-w-2xl">
+          <MessagingForm parentMessagingDefault={settings?.parentMessagingDefault ?? true} />
         </TabsContent>
 
         <TabsContent value="audit" className="mt-6">

@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireSession } from '@/lib/auth'
+import { requireSession, requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -77,16 +77,19 @@ export async function sendMessageAction(
     const recipient = await db.user.findUnique({ where: { id: recipientId } })
     if (!recipient) return { success: false, error: 'Recipient not found.' }
 
+    // Create root message — threadId must equal message.id, so we do a two-step write
     const message = await db.message.create({
       data: {
         senderId: user.id,
         subject: subject.trim(),
         body: body.trim(),
+        threadId: 'pending', // temporary; updated below
         recipients: {
           create: { userId: recipientId },
         },
       },
     })
+    await db.message.update({ where: { id: message.id }, data: { threadId: message.id } })
 
     revalidatePath('/communication/messages')
     return { success: true, id: message.id }
@@ -118,5 +121,82 @@ export async function recordNoticeReadAction(noticeId: string): Promise<void> {
     })
   } catch (err) {
     console.error('recordNoticeReadAction error:', err)
+  }
+}
+
+export async function sendReplyAction(
+  threadId: string,
+  body: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = await requireSession()
+
+    if (!body?.trim()) return { success: false, error: 'Reply body is required.' }
+
+    // Load the root (thread) message to find the other participant
+    const root = await db.message.findUnique({
+      where: { id: threadId },
+      include: { recipients: true },
+    })
+    if (!root) return { success: false, error: 'Thread not found.' }
+
+    // Check access
+    const isParticipant =
+      root.senderId === user.id || root.recipients.some(r => r.userId === user.id)
+    if (!isParticipant) return { success: false, error: 'Not authorised.' }
+
+    // If the replier is NOT the original sender, check allowParentReplies
+    if (user.id !== root.senderId) {
+      const staffRecord = await db.staff.findFirst({ where: { userId: root.senderId } })
+      if (staffRecord && !staffRecord.allowParentReplies) {
+        return { success: false, error: 'This staff member has disabled replies.' }
+      }
+    }
+
+    // Determine reply recipient (the other person in the thread)
+    const recipientId =
+      root.senderId === user.id
+        ? root.recipients[0]?.userId
+        : root.senderId
+
+    if (!recipientId) return { success: false, error: 'Cannot determine reply recipient.' }
+
+    await db.message.create({
+      data: {
+        senderId: user.id,
+        subject: null,
+        body: body.trim(),
+        parentId: threadId,
+        threadId,
+        recipients: { create: { userId: recipientId } },
+      },
+    })
+
+    revalidatePath(`/communication/messages/${threadId}`)
+    revalidatePath('/communication/messages')
+    revalidatePath('/portal/messages')
+    return { success: true }
+  } catch (err) {
+    console.error('sendReplyAction error:', err)
+    return { success: false, error: 'An unexpected error occurred.' }
+  }
+}
+
+export async function updateMessagingSettingsAction(
+  parentMessagingDefault: boolean,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireRole(['admin'])
+    const existing = await db.schoolSettings.findFirst()
+    if (!existing) return { success: false, error: 'School settings not found.' }
+    await db.schoolSettings.update({
+      where: { id: existing.id },
+      data: { parentMessagingDefault },
+    })
+    revalidatePath('/settings')
+    return { success: true }
+  } catch (err) {
+    console.error('updateMessagingSettingsAction error:', err)
+    return { success: false, error: 'Failed to update settings.' }
   }
 }

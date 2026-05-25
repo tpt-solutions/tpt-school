@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { GraduationCap, CalendarCheck, Award, Bell, DollarSign, ClipboardList } from 'lucide-react'
+import { GraduationCap, CalendarCheck, Award, Bell, DollarSign, ClipboardList, ScanLine, Mail } from 'lucide-react'
 
 function StatCard({
   title,
@@ -189,7 +189,7 @@ export default async function PortalPage() {
             View school notices →
           </Link>
           <Link
-            href="/communication/messages"
+            href="/portal/messages"
             className="text-sm text-primary font-medium hover:underline"
           >
             View messages →
@@ -316,15 +316,34 @@ export default async function PortalPage() {
         </div>
       )}
 
-      <div className="flex gap-3 flex-wrap">
-        <Link href="/assignments" className="text-sm text-primary font-medium hover:underline">
-          Submit assignments →
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Link
+          href="/portal/attendance"
+          className="flex items-center gap-3 bg-white border border-slate-200 hover:border-sky-300 hover:bg-sky-50 rounded-xl px-4 py-3 transition-colors"
+        >
+          <ScanLine className="w-5 h-5 text-sky-600 shrink-0" />
+          <span className="text-sm font-medium text-slate-700">Mark Attendance</span>
         </Link>
-        <Link href="/portal/notices" className="text-sm text-primary font-medium hover:underline">
-          View notices →
+        <Link
+          href="/assignments"
+          className="flex items-center gap-3 bg-white border border-slate-200 hover:border-orange-300 hover:bg-orange-50 rounded-xl px-4 py-3 transition-colors"
+        >
+          <ClipboardList className="w-5 h-5 text-orange-500 shrink-0" />
+          <span className="text-sm font-medium text-slate-700">Submit Assignments</span>
         </Link>
-        <Link href="/communication/messages" className="text-sm text-primary font-medium hover:underline">
-          View messages →
+        <Link
+          href="/portal/notices"
+          className="flex items-center gap-3 bg-white border border-slate-200 hover:border-amber-300 hover:bg-amber-50 rounded-xl px-4 py-3 transition-colors"
+        >
+          <Bell className="w-5 h-5 text-amber-500 shrink-0" />
+          <span className="text-sm font-medium text-slate-700">View Notices</span>
+        </Link>
+        <Link
+          href="/portal/messages"
+          className="flex items-center gap-3 bg-white border border-slate-200 hover:border-primary/30 hover:bg-primary/5 rounded-xl px-4 py-3 transition-colors"
+        >
+          <Mail className="w-5 h-5 text-primary shrink-0" />
+          <span className="text-sm font-medium text-slate-700">Messages</span>
         </Link>
       </div>
     </div>

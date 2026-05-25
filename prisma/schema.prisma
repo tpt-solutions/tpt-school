@@ -90,6 +90,8 @@ model SchoolSettings {
   aiModel        String?
   aiBaseUrl      String?
   aiReportMode   String   @default("assist") // assist | auto
+  // Messaging
+  parentMessagingDefault Boolean  @default(true)
   // Housekeeping
   lastSessionCleanup DateTime?
   createdAt      DateTime @default(now())
@@ -134,6 +136,8 @@ model Staff {
   employmentType String    @default("full-time")
   bio            String?
   qualifications String?
+
+  allowParentReplies      Boolean               @default(true)
 
   user                    User                  @relation(fields: [userId], references: [id])
   classes                 ClassTeacher[]
@@ -181,8 +185,11 @@ model Student {
   yearLevel         Int?
   enrollmentDate    DateTime @default(now())
   enrollmentStatus  String   @default("active")
+  nsn               String?   // National Student Number (NZ NSN / UK UPN / AU StateStudentId / CA OEN/PEN)
   nationality       String?
   ethnicity         String?
+  indigenousStatus  String?   // AU: 1=Aboriginal 2=TorresStrait 3=Both 4=Neither 9=NotStated
+  languageBackground String?  // AU: LBOTE source field
   religion          String?
   languages         String?
   medicalConditions String?
@@ -484,9 +491,15 @@ model Message {
   senderId   String
   subject    String?
   body       String
+  parentId   String?            // null = root message; set = reply
+  threadId   String             // denormalized root message id (equals id for root)
   createdAt  DateTime           @default(now())
   sender     User               @relation("SentMessages", fields: [senderId], references: [id])
   recipients MessageRecipient[]
+  parent     Message?           @relation("Replies", fields: [parentId], references: [id])
+  replies    Message[]          @relation("Replies")
+
+  @@index([threadId])
 }
 
 model MessageRecipient {
@@ -508,6 +521,32 @@ model EmailLog {
   sentAt    DateTime?
   error     String?
   createdAt DateTime  @default(now())
+}
+
+model AttendanceCode {
+  id          String               @id @default(cuid())
+  code        String               @unique
+  classId     String
+  date        DateTime
+  termId      String
+  createdById String
+  windowMins  Int                  @default(5)
+  expiresAt   DateTime
+  createdAt   DateTime             @default(now())
+  usages      AttendanceCodeUsage[]
+
+  @@index([code])
+  @@index([classId, date])
+}
+
+model AttendanceCodeUsage {
+  id        String         @id @default(cuid())
+  codeId    String
+  studentId String
+  usedAt    DateTime       @default(now())
+  code      AttendanceCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+
+  @@unique([codeId, studentId])
 }
 
 // ─── Finance & Fees ──────────────────────────────────────────────────────────

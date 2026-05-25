@@ -13,6 +13,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   output: process.env.DOCKER_BUILD === '1' ? 'standalone' : undefined,
+  turbopack: {},
 }
 
 export default withPWA(nextConfig)

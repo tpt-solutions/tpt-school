@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import RollForm from './roll-form'
+import CodePanel from './code-panel'
 import { format } from 'date-fns'
 
 interface PageProps {
@@ -91,7 +92,12 @@ export default async function TakeRollPage({ params }: PageProps) {
         </div>
       </div>
 
-      <RollForm classId={classId} students={students} termId={currentTerm?.id ?? ''} markedById={session.id} />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
+        <RollForm classId={classId} students={students} termId={currentTerm?.id ?? ''} markedById={session.id} />
+        <div className="lg:sticky lg:top-4">
+          <CodePanel classId={classId} termId={currentTerm?.id ?? ''} />
+        </div>
+      </div>
     </div>
   )
 }

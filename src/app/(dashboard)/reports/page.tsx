@@ -1,7 +1,7 @@
 import { requireRole } from '@/lib/auth'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, ClipboardCheck, DollarSign, BarChart2, FileText, HeartHandshake } from 'lucide-react'
+import { Users, ClipboardCheck, DollarSign, BarChart2, FileText, HeartHandshake, Database } from 'lucide-react'
 
 const REPORT_CARDS = [
   {
@@ -45,6 +45,13 @@ const REPORT_CARDS = [
     href: '/reports/parent-engagement',
     icon: HeartHandshake,
     color: 'bg-pink-100 text-pink-600',
+  },
+  {
+    title: 'SIS Data Export',
+    description: 'Export student and attendance data in NZ MoE, Ed-Fi, UK SIMS, AU Synergetic, CA PowerSchool, and universal CSV formats.',
+    href: '/reports/sis-export',
+    icon: Database,
+    color: 'bg-slate-100 text-slate-600',
   },
 ]
 

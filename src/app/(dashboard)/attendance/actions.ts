@@ -74,6 +74,26 @@ export async function saveAttendanceAction(
   }
 }
 
+export async function generateAttendanceCodeAction(
+  classId: string,
+  termId: string,
+  windowMins = 5,
+) {
+  const session = await requireRole(['admin', 'teacher'])
+
+  const code = Math.floor(Math.random() * 1000000).toString().padStart(6, '0')
+  const now = new Date()
+  const date = new Date(now)
+  date.setHours(0, 0, 0, 0)
+  const expiresAt = new Date(now.getTime() + windowMins * 60 * 1000)
+
+  const record = await db.attendanceCode.create({
+    data: { code, classId, date, termId, createdById: session.id, windowMins, expiresAt },
+  })
+
+  return { code: record.code, expiresAt: record.expiresAt.toISOString() }
+}
+
 export interface AttendanceFilters {
   studentId?: string
   classId?: string
