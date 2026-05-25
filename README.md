@@ -1,4 +1,4 @@
-# TPT School
+# TPT School.
 
 A school management system built with [Next.js](https://nextjs.org), [Prisma](https://prisma.io), and [SQLite](https://sqlite.org). Tracks students, classes, attendance, grades, and more.
 
