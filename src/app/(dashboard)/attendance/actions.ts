@@ -7,6 +7,8 @@ import { revalidatePath } from 'next/cache'
 import { teachesClass } from '@/lib/access'
 import { checkTruancy } from '@/lib/truancy'
 
+const ATTENDANCE_STATUSES = ['present', 'absent', 'late', 'excused'] as const
+
 export interface AttendanceRecord {
   studentId: string
   status: string
@@ -32,6 +34,9 @@ export async function saveAttendanceAction(
   )
   if (records.some(r => !enrolled.has(r.studentId))) {
     return { error: 'One or more students are not enrolled in this class' }
+  }
+  if (records.some(r => !ATTENDANCE_STATUSES.includes(r.status as (typeof ATTENDANCE_STATUSES)[number]))) {
+    return { error: `Attendance status must be one of: ${ATTENDANCE_STATUSES.join(', ')}` }
   }
 
   // Find the current term
@@ -102,6 +107,10 @@ export async function generateAttendanceCodeAction(
     return { error: 'You are not a teacher of this class' }
   }
 
+  if (!Number.isInteger(windowMins) || windowMins < 1 || windowMins > 60) {
+    return { error: 'Window must be between 1 and 60 minutes' }
+  }
+
   // crypto-grade randomness: this code gates attendance self-check-in
   const code = randomInt(0, 1000000).toString().padStart(6, '0')
   const now = new Date()
@@ -128,6 +137,9 @@ export async function getAttendanceReport(filters: AttendanceFilters) {
 
   const startDate = filters.startDate ? new Date(filters.startDate) : undefined
   const endDate = filters.endDate ? new Date(filters.endDate) : undefined
+  if ((startDate && Number.isNaN(startDate.getTime())) || (endDate && Number.isNaN(endDate.getTime()))) {
+    throw new Error('Invalid date filter')
+  }
   if (endDate) endDate.setHours(23, 59, 59, 999)
 
   // If filtering by classId, get enrolled student IDs

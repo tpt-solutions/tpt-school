@@ -5,33 +5,37 @@ import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { ClassFullError, appendToWaitlistTx, enrolInTx, renumberWaitlistTx } from '@/lib/enrolment'
+import { z } from 'zod'
+import { field, formRecord, parseWith } from '@/lib/form'
+
+const classSchema = z.object({
+  name: field.required('Class name', 150),
+  code: field.required('Class code', 30),
+  subject: field.optional('Subject', 100),
+  yearLevel: field.optionalInt('Year level', 0, 20),
+  maxStudents: field.optionalInt('Max students', 1, 1000),
+  description: field.optional('Description', 2000),
+  roomId: field.optional('Room', 64),
+  academicYearId: field.required('Academic year', 64),
+  staffId: field.optional('Teacher', 64),
+})
 
 export async function createClassAction(formData: FormData) {
   await requireRole(['admin'])
 
-  const name = formData.get('name') as string
-  const code = formData.get('code') as string
-  const subject = formData.get('subject') as string
-  const yearLevel = formData.get('yearLevel') ? Number(formData.get('yearLevel')) : null
-  const maxStudents = formData.get('maxStudents') ? Number(formData.get('maxStudents')) : null
-  const description = formData.get('description') as string
-  const roomId = formData.get('roomId') as string || null
-  const academicYearId = formData.get('academicYearId') as string
-  const staffId = formData.get('staffId') as string || null
-
-  if (!name || !code || !academicYearId) {
-    return { error: 'Name, code, and academic year are required' }
-  }
+  const parsed = parseWith(classSchema, formRecord(formData))
+  if (!parsed.ok) return { error: parsed.error }
+  const { name, code, subject, yearLevel, maxStudents, description, roomId, academicYearId, staffId } = parsed.data
 
   try {
     const cls = await db.class.create({
       data: {
         name,
         code,
-        subject: subject || null,
+        subject,
         yearLevel,
         maxStudents,
-        description: description || null,
+        description,
         roomId,
         academicYearId,
       },
@@ -42,32 +46,24 @@ export async function createClassAction(formData: FormData) {
         data: { classId: cls.id, staffId, isPrimary: true },
       })
     }
-
-    revalidatePath('/classes')
-    redirect('/classes')
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Failed to create class'
+    const msg = e instanceof Error ? e.message : ''
     if (msg.includes('Unique constraint')) return { error: 'Class code already exists for this year' }
-    return { error: msg }
+    console.error('createClassAction error:', e)
+    return { error: 'Failed to create class' }
   }
+
+  revalidatePath('/classes')
+  // redirect() throws to unwind, so it must stay outside the try/catch above.
+  redirect('/classes')
 }
 
 export async function updateClassAction(id: string, formData: FormData) {
   await requireRole(['admin'])
 
-  const name = formData.get('name') as string
-  const code = formData.get('code') as string
-  const subject = formData.get('subject') as string
-  const yearLevel = formData.get('yearLevel') ? Number(formData.get('yearLevel')) : null
-  const maxStudents = formData.get('maxStudents') ? Number(formData.get('maxStudents')) : null
-  const description = formData.get('description') as string
-  const roomId = formData.get('roomId') as string || null
-  const academicYearId = formData.get('academicYearId') as string
-  const staffId = formData.get('staffId') as string || null
-
-  if (!name || !code || !academicYearId) {
-    return { error: 'Name, code, and academic year are required' }
-  }
+  const parsed = parseWith(classSchema, formRecord(formData))
+  if (!parsed.ok) return { error: parsed.error }
+  const { name, code, subject, yearLevel, maxStudents, description, roomId, academicYearId, staffId } = parsed.data
 
   try {
     await db.class.update({
@@ -75,10 +71,10 @@ export async function updateClassAction(id: string, formData: FormData) {
       data: {
         name,
         code,
-        subject: subject || null,
+        subject,
         yearLevel,
         maxStudents,
-        description: description || null,
+        description,
         roomId,
         academicYearId,
       },
@@ -91,14 +87,17 @@ export async function updateClassAction(id: string, formData: FormData) {
         update: { isPrimary: true },
       })
     }
-
-    revalidatePath('/classes')
-    revalidatePath(`/classes/${id}`)
-    redirect(`/classes/${id}`)
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Failed to update class'
-    return { error: msg }
+    const msg = e instanceof Error ? e.message : ''
+    if (msg.includes('Unique constraint')) return { error: 'Class code already exists for this year' }
+    console.error('updateClassAction error:', e)
+    return { error: 'Failed to update class' }
   }
+
+  revalidatePath('/classes')
+  revalidatePath(`/classes/${id}`)
+  // redirect() throws to unwind, so it must stay outside the try/catch above.
+  redirect(`/classes/${id}`)
 }
 
 export async function enrollStudentAction(classId: string, studentId: string) {

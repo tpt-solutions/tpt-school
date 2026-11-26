@@ -3,6 +3,7 @@
 import { db } from '@/lib/db'
 import { requireSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { field, parseWith } from '@/lib/form'
 
 export async function submitAssignmentAction(
   gradebookId: string,
@@ -12,6 +13,11 @@ export async function submitAssignmentAction(
   if (session.role !== 'student') {
     return { success: false, error: 'Only students can submit assignments.' }
   }
+
+  // Teachers open this link from the gradebook, so only http(s) is allowed (no javascript: links)
+  const urlParsed = parseWith(field.optionalHttpUrl('Submission link'), submissionUrl ?? '')
+  if (!urlParsed.ok) return { success: false, error: urlParsed.error }
+  const safeUrl = urlParsed.data
 
   const student = await db.student.findUnique({ where: { userId: session.id } })
   if (!student) return { success: false, error: 'Student profile not found.' }
@@ -33,11 +39,11 @@ export async function submitAssignmentAction(
       gradebookId,
       studentId: student.id,
       submittedAt: new Date(),
-      submissionUrl: submissionUrl?.trim() || null,
+      submissionUrl: safeUrl,
     },
     update: {
       submittedAt: new Date(),
-      submissionUrl: submissionUrl?.trim() || null,
+      submissionUrl: safeUrl,
     },
   })
 

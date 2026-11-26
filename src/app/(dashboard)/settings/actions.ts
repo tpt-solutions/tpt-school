@@ -5,6 +5,8 @@ import { requireRole } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt, isEncrypted } from '@/lib/crypto'
+import { z } from 'zod'
+import { field, formRecord, parseWith } from '@/lib/form'
 
 // ─── Rooms ────────────────────────────────────────────────────────────────────
 
@@ -18,7 +20,9 @@ export async function createRoomAction(
   const building = (formData.get('building') as string)?.trim() || null
   const floor = (formData.get('floor') as string)?.trim() || null
   const capacityRaw = formData.get('capacity') as string
-  const capacity = capacityRaw ? parseInt(capacityRaw, 10) : null
+  const capacityParsed = parseWith(field.optionalInt('Capacity', 0, 10000), capacityRaw ?? '')
+  if (!capacityParsed.ok) return { success: false, error: capacityParsed.error }
+  const capacity = capacityParsed.data
 
   if (!name || !code) return { success: false, error: 'Name and code are required.' }
 
@@ -46,7 +50,9 @@ export async function updateRoomAction(
   const building = (formData.get('building') as string)?.trim() || null
   const floor = (formData.get('floor') as string)?.trim() || null
   const capacityRaw = formData.get('capacity') as string
-  const capacity = capacityRaw ? parseInt(capacityRaw, 10) : null
+  const capacityParsed = parseWith(field.optionalInt('Capacity', 0, 10000), capacityRaw ?? '')
+  if (!capacityParsed.ok) return { success: false, error: capacityParsed.error }
+  const capacity = capacityParsed.data
 
   if (!name || !code) return { success: false, error: 'Name and code are required.' }
 
@@ -86,20 +92,22 @@ export async function updateSchoolSettingsAction(
     const actor = await requireRole(['admin'])
     await logAudit(actor.id, 'UPDATE', 'SchoolSettings', 'Updated school settings')
 
-    const data = {
-      name: (formData.get('name') as string)?.trim() || '',
-      shortName: (formData.get('shortName') as string)?.trim() || null,
-      address: (formData.get('address') as string)?.trim() || null,
-      phone: (formData.get('phone') as string)?.trim() || null,
-      email: (formData.get('email') as string)?.trim() || null,
-      website: (formData.get('website') as string)?.trim() || null,
-      schoolType: (formData.get('schoolType') as string)?.trim() || undefined,
-      timezone: (formData.get('timezone') as string)?.trim() || 'UTC',
-      currencyCode: (formData.get('currencyCode') as string)?.trim() || 'USD',
-      currencySymbol: (formData.get('currencySymbol') as string)?.trim() || '$',
-    }
-
-    if (!data.name) return { success: false, error: 'School name is required.' }
+    const schoolSchema = z.object({
+      name: field.required('School name', 150),
+      shortName: field.optional('Short name', 50),
+      address: field.optional('Address', 500),
+      phone: field.optional('Phone', 50),
+      email: field.optionalEmail('Email'),
+      // Stored and later rendered as a link, so only http(s) is accepted (blocks javascript: URLs)
+      website: field.optionalHttpUrl('Website'),
+      schoolType: field.optional('School type', 50).transform(v => v ?? undefined),
+      timezone: field.optional('Timezone', 100).transform(v => v ?? 'UTC'),
+      currencyCode: field.optional('Currency code', 3).transform(v => v ?? 'USD'),
+      currencySymbol: field.optional('Currency symbol', 5).transform(v => v ?? '$'),
+    })
+    const parsed = parseWith(schoolSchema, formRecord(formData))
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const data = parsed.data
 
     const existing = await db.schoolSettings.findFirst()
     if (existing) {
@@ -126,17 +134,16 @@ export async function createAcademicYearAction(
   try {
     await requireRole(['admin'])
 
-    const yearRaw = formData.get('year') as string
-    const startDateRaw = formData.get('startDate') as string
-    const endDateRaw = formData.get('endDate') as string
-
-    if (!yearRaw || !startDateRaw || !endDateRaw) {
-      return { success: false, error: 'Year, start date, and end date are required.' }
-    }
-
-    const year = parseInt(yearRaw, 10)
-    const startDate = new Date(startDateRaw)
-    const endDate = new Date(endDateRaw)
+    const yearParsed = parseWith(
+      z.object({
+        year: field.int('Year', 2000, 2100),
+        startDate: field.date('Start date'),
+        endDate: field.date('End date'),
+      }),
+      formRecord(formData),
+    )
+    if (!yearParsed.ok) return { success: false, error: yearParsed.error }
+    const { year, startDate, endDate } = yearParsed.data
 
     if (endDate <= startDate) {
       return { success: false, error: 'End date must be after start date.' }
@@ -204,23 +211,21 @@ export async function createTermAction(
   try {
     await requireRole(['admin'])
 
-    const termNumberRaw = formData.get('termNumber') as string
-    const name = (formData.get('name') as string)?.trim()
-    const startDateRaw = formData.get('startDate') as string
-    const endDateRaw = formData.get('endDate') as string
-
-    if (!termNumberRaw || !name || !startDateRaw || !endDateRaw) {
-      return { success: false, error: 'All term fields are required.' }
-    }
+    const termParsed = parseWith(
+      z.object({
+        termNumber: field.int('Term number', 1, 10),
+        name: field.required('Term name', 100),
+        startDate: field.date('Start date'),
+        endDate: field.date('End date'),
+      }),
+      formRecord(formData),
+    )
+    if (!termParsed.ok) return { success: false, error: termParsed.error }
+    const { termNumber, name, startDate, endDate } = termParsed.data
+    if (endDate <= startDate) return { success: false, error: 'End date must be after start date.' }
 
     await db.term.create({
-      data: {
-        academicYearId,
-        termNumber: parseInt(termNumberRaw, 10),
-        name,
-        startDate: new Date(startDateRaw),
-        endDate: new Date(endDateRaw),
-      },
+      data: { academicYearId, termNumber, name, startDate, endDate },
     })
 
     revalidatePath('/settings')
@@ -238,16 +243,16 @@ export async function updateTermAction(
   try {
     await requireRole(['admin'])
 
-    const name = (formData.get('name') as string)?.trim()
-    const startDateRaw = formData.get('startDate') as string
-    const endDateRaw = formData.get('endDate') as string
-
-    if (!name || !startDateRaw || !endDateRaw) {
-      return { success: false, error: 'All term fields are required.' }
-    }
-
-    const startDate = new Date(startDateRaw)
-    const endDate = new Date(endDateRaw)
+    const termParsed = parseWith(
+      z.object({
+        name: field.required('Term name', 100),
+        startDate: field.date('Start date'),
+        endDate: field.date('End date'),
+      }),
+      formRecord(formData),
+    )
+    if (!termParsed.ok) return { success: false, error: termParsed.error }
+    const { name, startDate, endDate } = termParsed.data
     if (endDate <= startDate) {
       return { success: false, error: 'End date must be after start date.' }
     }
@@ -273,22 +278,31 @@ export async function updateSmtpAction(
   try {
     await requireRole(['admin'])
 
-    const smtpHost = (formData.get('smtpHost') as string)?.trim() || null
-    const smtpPortRaw = formData.get('smtpPort') as string
-    const smtpUser = (formData.get('smtpUser') as string)?.trim() || null
-    const smtpPass = (formData.get('smtpPass') as string)?.trim() || null
-    const smtpFrom = (formData.get('smtpFrom') as string)?.trim() || null
-
-    const smtpPort = smtpPortRaw ? parseInt(smtpPortRaw, 10) : null
-
-    // Encrypt the password before storing — leave null/empty as-is
-    const encryptedPass = smtpPass ? encrypt(smtpPass) : null
+    const smtpParsed = parseWith(
+      z.object({
+        smtpHost: field.optional('SMTP host', 255),
+        smtpPort: field.optionalInt('SMTP port', 1, 65535),
+        smtpUser: field.optional('SMTP username', 255),
+        smtpFrom: field.optional('From address', 255),
+      }),
+      formRecord(formData),
+    )
+    if (!smtpParsed.ok) return { success: false, error: smtpParsed.error }
+    const { smtpHost, smtpPort, smtpUser, smtpFrom } = smtpParsed.data
+    // A blank password means "keep the stored one", so re-saving the form does not wipe it.
+    const newPass = (formData.get('smtpPass') as string | null)?.trim() || null
 
     const existing = await db.schoolSettings.findFirst()
     if (existing) {
       await db.schoolSettings.update({
         where: { id: existing.id },
-        data: { smtpHost, smtpPort, smtpUser, smtpPass: encryptedPass, smtpFrom },
+        data: {
+          smtpHost,
+          smtpPort,
+          smtpUser,
+          smtpFrom,
+          ...(newPass ? { smtpPass: encrypt(newPass) } : {}),
+        },
       })
     } else {
       return { success: false, error: 'School settings not found. Complete setup first.' }

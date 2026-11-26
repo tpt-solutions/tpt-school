@@ -3,6 +3,19 @@
 import { db } from '@/lib/db'
 import { requireRole, requireSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { field, formRecord, parseWith } from '@/lib/form'
+
+const eventSchema = z.object({
+  title: field.required('Title', 200),
+  description: field.optional('Description', 2000),
+  startDate: field.date('Start date'),
+  endDate: field.date('End date'),
+  category: field.optional('Category', 50).transform(v => v ?? 'academic'),
+  // Stored as "all" or a JSON array; the length cap stops oversized values
+  targetRoles: field.optional('Audience', 200).transform(v => v ?? 'all'),
+  targetYears: field.optional('Year levels', 200).transform(v => v ?? 'all'),
+})
 
 export async function createSchoolEventAction(
   formData: FormData,
@@ -10,20 +23,11 @@ export async function createSchoolEventAction(
   try {
     const session = await requireRole(['admin'])
 
-    const title = (formData.get('title') as string)?.trim()
-    const description = (formData.get('description') as string)?.trim() || null
-    const startDateRaw = formData.get('startDate') as string
-    const endDateRaw = formData.get('endDate') as string
+    const parsed = parseWith(eventSchema, formRecord(formData))
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const { title, description, startDate, endDate, category, targetRoles, targetYears } = parsed.data
     const allDay = formData.get('allDay') !== 'false'
-    const category = (formData.get('category') as string) || 'academic'
-    const targetRoles = (formData.get('targetRoles') as string) || 'all'
-    const targetYears = (formData.get('targetYears') as string) || 'all'
 
-    if (!title) return { success: false, error: 'Title is required.' }
-    if (!startDateRaw || !endDateRaw) return { success: false, error: 'Start and end dates are required.' }
-
-    const startDate = new Date(startDateRaw)
-    const endDate = new Date(endDateRaw)
     if (endDate < startDate) return { success: false, error: 'End date must be on or after start date.' }
 
     await db.schoolEvent.create({
@@ -55,23 +59,18 @@ export async function updateSchoolEventAction(
   try {
     await requireRole(['admin'])
 
-    const title = (formData.get('title') as string)?.trim()
-    const description = (formData.get('description') as string)?.trim() || null
-    const startDateRaw = formData.get('startDate') as string
-    const endDateRaw = formData.get('endDate') as string
-    const category = (formData.get('category') as string) || 'academic'
-    const targetRoles = (formData.get('targetRoles') as string) || 'all'
-    const targetYears = (formData.get('targetYears') as string) || 'all'
-
-    if (!title) return { success: false, error: 'Title is required.' }
+    const parsed = parseWith(eventSchema, formRecord(formData))
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const { title, description, startDate, endDate, category, targetRoles, targetYears } = parsed.data
+    if (endDate < startDate) return { success: false, error: 'End date must be on or after start date.' }
 
     await db.schoolEvent.update({
       where: { id },
       data: {
         title,
         description,
-        startDate: new Date(startDateRaw),
-        endDate: new Date(endDateRaw),
+        startDate,
+        endDate,
         category,
         targetRoles,
         targetYears,

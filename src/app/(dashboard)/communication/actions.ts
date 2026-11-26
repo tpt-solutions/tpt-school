@@ -5,6 +5,8 @@ import { requireSession, requireRole } from '@/lib/auth'
 import { canMessage } from '@/lib/access'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { z } from 'zod'
+import { field, formList, formRecord, parseWith } from '@/lib/form'
 
 // ─── Notices ─────────────────────────────────────────────────────────────────
 
@@ -13,28 +15,40 @@ export async function createNoticeAction(formData: FormData): Promise<{ success:
     // School-wide notices are published by admins only
     const user = await requireRole(['admin'])
 
-    const title = (formData.get('title') as string)?.trim()
-    const body = (formData.get('body') as string)?.trim()
-    const category = (formData.get('category') as string) || 'general'
+    const noticeSchema = z.object({
+      title: field.required('Title', 200),
+      body: field.required('Body', 10000),
+      category: field.optional('Category', 50).transform(v => v ?? 'general'),
+      publishedAt: field.optionalDate('Publish date'),
+      expiresAt: field.optionalDate('Expiry date'),
+    })
+    const parsed = parseWith(noticeSchema, formRecord(formData))
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const { title, body, category, publishedAt, expiresAt } = parsed.data
     const pinned = formData.get('pinned') === 'true'
-    const publishedAtRaw = formData.get('publishedAt') as string
-    const expiresAtRaw = formData.get('expiresAt') as string
+
+    if (publishedAt && expiresAt && expiresAt < publishedAt) {
+      return { success: false, error: 'Expiry date cannot be before the publish date.' }
+    }
 
     // targetRoles: JSON array or "all"
-    const targetRolesRaw = formData.getAll('targetRoles') as string[]
+    const ROLES = ['admin', 'teacher', 'parent', 'student'] as const
+    const targetRolesRaw = formList(formData, 'targetRoles')
+    if (!targetRolesRaw.every(r => (ROLES as readonly string[]).includes(r) || r === 'all')) {
+      return { success: false, error: 'Invalid audience role.' }
+    }
     const targetRoles = targetRolesRaw.length === 0 || targetRolesRaw.includes('all')
       ? 'all'
       : JSON.stringify(targetRolesRaw)
 
-    // targetYears: JSON array or "all"
-    const targetYearsRaw = formData.getAll('targetYears') as string[]
+    // targetYears: JSON array of year levels, or "all"
+    const targetYearsRaw = formList(formData, 'targetYears')
+    if (!targetYearsRaw.every(y => y === 'all' || /^\d{1,2}$/.test(y) && Number(y) <= 20)) {
+      return { success: false, error: 'Year levels must be whole numbers between 0 and 20.' }
+    }
     const targetYears = targetYearsRaw.length === 0 || targetYearsRaw.includes('all')
       ? 'all'
       : JSON.stringify(targetYearsRaw.map(Number))
-
-    if (!title || !body) {
-      return { success: false, error: 'Title and body are required.' }
-    }
 
     await db.notice.create({
       data: {
@@ -45,8 +59,8 @@ export async function createNoticeAction(formData: FormData): Promise<{ success:
         targetRoles,
         targetYears,
         authorId: user.id,
-        publishedAt: publishedAtRaw ? new Date(publishedAtRaw) : new Date(),
-        expiresAt: expiresAtRaw ? new Date(expiresAtRaw) : null,
+        publishedAt: publishedAt ?? new Date(),
+        expiresAt,
       },
     })
 

@@ -25,6 +25,10 @@ export async function submitEnrolmentRequestAction(
     return { success: false, error: 'Parent requests must specify a student.' }
   }
 
+  if (message && message.trim().length > 1000) {
+    return { success: false, error: 'Message must be 1000 characters or fewer.' }
+  }
+
   const existing = await db.enrolmentRequest.findUnique({
     where: { classId_studentId: { classId, studentId } },
   })
@@ -51,6 +55,9 @@ export async function submitParentEnrolmentRequestAction(
   const session = await requireSession()
   if (session.role !== 'parent' && session.role !== 'admin') {
     return { success: false, error: 'Not authorized.' }
+  }
+  if (message && message.trim().length > 1000) {
+    return { success: false, error: 'Message must be 1000 characters or fewer.' }
   }
 
   if (session.role === 'parent') {

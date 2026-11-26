@@ -6,19 +6,32 @@ import { canAccessStudent } from "@/lib/access";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sendEmail, behaviourEmailHtml } from "@/lib/email";
+import { z } from "zod";
+import { field, checkbox, formRecord, parseWith } from "@/lib/form";
+import { checkDateRange } from "@/lib/validation";
+
+const SEVERITIES = ["minor", "moderate", "major", "critical"] as const;
+const SUSPENSION_TYPES = ["in-school", "out-of-school"] as const;
+const EXIT_TYPES = ["withdrawn", "transferred", "expelled", "graduated", "deceased", "other"] as const;
+
+const incidentSchema = z.object({
+  studentId: field.required("Student", 64),
+  date: field.date("Date"),
+  description: field.required("Description", 5000),
+  location: field.optional("Location", 200),
+  severity: field.oneOf("Severity", SEVERITIES).default("minor"),
+  witnesses: field.optional("Witnesses", 1000),
+  actionTaken: field.optional("Action taken", 2000),
+});
 
 export async function createIncidentAction(formData: FormData) {
   const session = await requireRole(["admin", "teacher"]);
 
-  const studentId = formData.get("studentId") as string;
-  const date = new Date(formData.get("date") as string);
-  const description = formData.get("description") as string;
-  const location = formData.get("location") as string | null;
-  const severity = (formData.get("severity") as string) || "minor";
-  const witnesses = formData.get("witnesses") as string | null;
-  const actionTaken = formData.get("actionTaken") as string | null;
-  const parentNotified = formData.get("parentNotified") === "on";
-  const followUpRequired = formData.get("followUpRequired") === "on";
+  const parsed = parseWith(incidentSchema, formRecord(formData));
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  const { studentId, date, description, location, severity, witnesses, actionTaken } = parsed.data;
+  const parentNotified = checkbox(formData.get("parentNotified") as string | null);
+  const followUpRequired = checkbox(formData.get("followUpRequired") as string | null);
 
   try {
     const incident = await db.behaviourIncident.create({
@@ -102,9 +115,20 @@ export async function createSuspensionAction(
 ) {
   const session = await requireRole(["admin"]);
 
-  const studentId = formData.get("studentId") as string;
-  const startDate = new Date(formData.get("startDate") as string);
-  const endDate = new Date(formData.get("endDate") as string);
+  const suspensionSchema = z.object({
+    studentId: field.required("Student", 64),
+    type: field.oneOf("Suspension type", SUSPENSION_TYPES).default("out-of-school"),
+    startDate: field.date("Start date"),
+    endDate: field.date("End date"),
+    reason: field.required("Reason", 2000),
+    returnConditions: field.optional("Return conditions", 2000),
+  });
+  const parsed = parseWith(suspensionSchema, formRecord(formData));
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  const { studentId, type, startDate, endDate, reason, returnConditions } = parsed.data;
+  const rangeError = checkDateRange(startDate.toISOString(), endDate.toISOString());
+  if (rangeError) return { success: false, error: rangeError };
+
   const totalDays = Math.max(
     1,
     Math.round(
@@ -117,14 +141,14 @@ export async function createSuspensionAction(
       data: {
         studentId,
         incidentId: incidentId || null,
-        type: (formData.get("type") as string) || "out-of-school",
+        type,
         startDate,
         endDate,
         totalDays,
-        reason: formData.get("reason") as string,
-        returnConditions: (formData.get("returnConditions") as string) || null,
+        reason,
+        returnConditions,
         authorisedBy: session.id,
-        parentNotified: formData.get("parentNotified") === "on",
+        parentNotified: checkbox(formData.get("parentNotified") as string | null),
       },
     });
     revalidatePath(`/students/${studentId}`);
@@ -139,9 +163,17 @@ export async function createSuspensionAction(
 export async function exitStudentAction(formData: FormData) {
   await requireRole(["admin"]);
 
-  const studentId = formData.get("studentId") as string;
-  const exitType = formData.get("exitType") as string;
-  const exitDate = new Date(formData.get("exitDate") as string);
+  const exitSchema = z.object({
+    studentId: field.required("Student", 64),
+    exitType: field.oneOf("Exit type", EXIT_TYPES),
+    exitDate: field.date("Exit date"),
+    reason: field.optional("Reason", 2000),
+    destinationSchool: field.optional("Destination school", 200),
+    notes: field.optional("Notes", 4000),
+  });
+  const parsed = parseWith(exitSchema, formRecord(formData));
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  const { studentId, exitType, exitDate, reason, destinationSchool, notes } = parsed.data;
 
   try {
     await db.$transaction([
@@ -150,11 +182,10 @@ export async function exitStudentAction(formData: FormData) {
           studentId,
           exitType,
           exitDate,
-          reason: (formData.get("reason") as string) || null,
-          destinationSchool:
-            (formData.get("destinationSchool") as string) || null,
-          notes: (formData.get("notes") as string) || null,
-          documentsIssued: formData.get("documentsIssued") === "on",
+          reason,
+          destinationSchool,
+          notes,
+          documentsIssued: checkbox(formData.get("documentsIssued") as string | null),
         },
       }),
       db.student.update({

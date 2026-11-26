@@ -4,6 +4,8 @@ import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { generateSlots, type ProposedSlot } from './generator-algorithm'
+import { z } from 'zod'
+import { field } from '@/lib/form'
 
 export type { ProposedSlot }
 
@@ -18,8 +20,31 @@ export interface SlotData {
   notes?: string | null
 }
 
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
+
+// Days are 1 (Mon) to 5 (Fri); periods are 1 to 20. Times are zero-padded 24h HH:MM.
+const slotSchema = z
+  .object({
+    classId: field.required('Class', 64),
+    staffId: field.optional('Teacher', 64),
+    roomId: field.optional('Room', 64),
+    dayOfWeek: z.number().int({ message: 'Day must be a whole number.' }).min(1, { message: 'Day must be Monday to Friday.' }).max(5, { message: 'Day must be Monday to Friday.' }),
+    period: z.number().int({ message: 'Period must be a whole number.' }).min(1, { message: 'Period must be between 1 and 20.' }).max(20, { message: 'Period must be between 1 and 20.' }),
+    startTime: z.string().regex(TIME_PATTERN, { message: 'Start time must be HH:MM.' }),
+    endTime: z.string().regex(TIME_PATTERN, { message: 'End time must be HH:MM.' }),
+    notes: z.string().max(500, { message: 'Notes must be 500 characters or fewer.' }).nullish(),
+  })
+  .refine(d => d.endTime > d.startTime, { message: 'End time must be after start time.', path: ['endTime'] })
+
+function slotError(data: SlotData): string | null {
+  const result = slotSchema.safeParse(data)
+  return result.success ? null : (result.error.issues[0]?.message ?? 'Invalid slot.')
+}
+
 export async function createSlotAction(data: SlotData) {
   await requireRole(['admin'])
+  const err = slotError(data)
+  if (err) return { error: err }
 
   try {
     await db.timetableSlot.create({
@@ -44,6 +69,8 @@ export async function createSlotAction(data: SlotData) {
 
 export async function updateSlotAction(id: string, data: SlotData) {
   await requireRole(['admin'])
+  const err = slotError(data)
+  if (err) return { error: err }
 
   try {
     await db.timetableSlot.update({
@@ -91,6 +118,13 @@ export async function bulkCreateSlotsAction(
   const errors: string[] = []
 
   for (const slot of slots) {
+    const slotProblem = slotError(slot)
+    if (slotProblem) {
+      errors.push(slotProblem)
+      skipped++
+      continue
+    }
+
     const existing = await db.timetableSlot.findFirst({
       where: { classId: slot.classId, dayOfWeek: slot.dayOfWeek, period: slot.period },
     })
@@ -156,6 +190,12 @@ export interface RequirementData {
 
 export async function createRequirementAction(data: RequirementData) {
   await requireRole(['admin'])
+  if (!Number.isInteger(data.periodsPerWeek) || data.periodsPerWeek < 1 || data.periodsPerWeek > 20) {
+    return { error: 'Periods per week must be a whole number between 1 and 20' }
+  }
+  if (data.label && data.label.length > 100) {
+    return { error: 'Label must be 100 characters or fewer' }
+  }
 
   try {
     await db.timetableRequirement.create({
