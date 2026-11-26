@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { buttonVariants } from '@/components/ui/button'
 import { requireRole } from '@/lib/auth'
 import { db } from '@/lib/db'
 import TimetableGrid from './timetable-grid'
@@ -63,11 +65,18 @@ export default async function TimetablePage() {
             {activeYear ? ` — ${activeYear.year}` : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-slate-400">
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Link href="/timetable/import" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Import CSV
+            </Link>
+          )}
+          <div className="flex items-center gap-2 text-slate-400">
           <Calendar className="w-5 h-5" />
           <span className="text-sm">
             {isAdmin ? 'Click a cell to add or edit a slot' : 'Read-only view'}
           </span>
+        </div>
         </div>
       </div>
 
