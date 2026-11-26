@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { queryDate } from '@/lib/form'
 import { buildUniversalAttendanceRow, buildCsvString, UNIVERSAL_ATTENDANCE_HEADERS, ExportAttendance } from '@/lib/sis-export'
 
 export const dynamic = 'force-dynamic'
@@ -11,15 +12,23 @@ export async function GET(req: NextRequest) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
 
-  const from = req.nextUrl.searchParams.get('from')
-  const to = req.nextUrl.searchParams.get('to')
+  const fromRaw = req.nextUrl.searchParams.get('from')
+  const toRaw = req.nextUrl.searchParams.get('to')
+  // Invalid dates are rejected with 400 rather than reaching the query
+  const from = fromRaw ? queryDate(fromRaw) : undefined
+  const to = toRaw ? queryDate(toRaw) : undefined
+  if ((fromRaw && !from) || (toRaw && !to)) {
+    return new NextResponse('from and to must be valid dates (YYYY-MM-DD)', { status: 400 })
+  }
+  // The end date is inclusive: include the whole of that day
+  if (to) to.setHours(23, 59, 59, 999)
 
   const records = await db.attendance.findMany({
     where: {
       ...(from || to ? {
         date: {
-          ...(from ? { gte: new Date(from) } : {}),
-          ...(to ? { lte: new Date(to) } : {}),
+          ...(from ? { gte: from } : {}),
+          ...(to ? { lte: to } : {}),
         },
       } : {}),
     },

@@ -3,17 +3,28 @@
 import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { field, parseWith } from '@/lib/form'
+
+const NOTE_TYPES = ['general', 'academic', 'medical', 'behaviour', 'pastoral'] as const
+
+const noteSchema = z.object({
+  content: field.required('Note content', 5000),
+  type: field.oneOf('Note type', NOTE_TYPES),
+})
 
 export async function createNoteAction(
   studentId: string,
   formData: FormData,
 ): Promise<{ success: boolean; error?: string }> {
   const session = await requireRole(['admin', 'teacher'])
-  const content = (formData.get('content') as string)?.trim()
-  const type = (formData.get('type') as string) || 'general'
+  const parsed = parseWith(noteSchema, {
+    content: formData.get('content') ?? '',
+    type: formData.get('type') || 'general',
+  })
+  if (!parsed.ok) return { success: false, error: parsed.error }
+  const { content, type } = parsed.data
   const isPrivate = formData.get('private') === 'true' && session.role === 'admin'
-
-  if (!content) return { success: false, error: 'Note content is required.' }
 
   await db.studentNote.create({
     data: { studentId, authorId: session.id, content, type, private: isPrivate },
@@ -35,11 +46,13 @@ export async function updateNoteAction(
     return { success: false, error: 'You can only edit your own notes.' }
   }
 
-  const content = (formData.get('content') as string)?.trim()
-  const type = (formData.get('type') as string) || note.type
+  const parsed = parseWith(noteSchema, {
+    content: formData.get('content') ?? '',
+    type: formData.get('type') || note.type,
+  })
+  if (!parsed.ok) return { success: false, error: parsed.error }
+  const { content, type } = parsed.data
   const isPrivate = session.role === 'admin' ? formData.get('private') === 'true' : note.private
-
-  if (!content) return { success: false, error: 'Note content is required.' }
 
   await db.studentNote.update({
     where: { id: noteId },

@@ -5,9 +5,25 @@ import { db } from '@/lib/db'
 import { hashPassword, requireRole, requireSession } from '@/lib/auth'
 import { nextEmployeeId, withIdRetry } from '@/lib/ids'
 import { checkDateRange, checkPersonFields } from '@/lib/validation'
+import { field, formRecord, parseWith } from '@/lib/form'
+import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendEmail, leaveDecisionEmailHtml } from '@/lib/email'
+
+const EMPLOYMENT_TYPES = ['full-time', 'part-time', 'casual'] as const
+
+const staffFieldsSchema = z.object({
+  firstName: field.required('First name', 100),
+  lastName: field.required('Last name', 100),
+  email: field.required('Email', 254),
+  phone: field.optional('Phone', 40),
+  jobTitle: field.optional('Job title', 120),
+  department: field.optional('Department', 120),
+  employmentType: field.oneOf('Employment type', EMPLOYMENT_TYPES),
+  bio: field.optional('Bio', 4000),
+  qualifications: field.optional('Qualifications', 2000),
+})
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -21,20 +37,14 @@ export async function createStaffAction(formData: FormData): Promise<{ success: 
   await requireRole(['admin'])
 
   try {
-    const firstName = (formData.get('firstName') as string)?.trim()
-    const lastName = (formData.get('lastName') as string)?.trim()
-    const email = (formData.get('email') as string)?.trim().toLowerCase()
-    const phone = (formData.get('phone') as string)?.trim() || null
-    const jobTitle = (formData.get('jobTitle') as string)?.trim() || null
-    const department = (formData.get('department') as string)?.trim() || null
-    const employmentType = (formData.get('employmentType') as string) || 'full-time'
+    const parsed = parseWith(staffFieldsSchema, {
+      ...formRecord(formData),
+      employmentType: String(formData.get('employmentType') || 'full-time'),
+    })
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const { firstName, lastName, phone, jobTitle, department, employmentType, bio, qualifications } = parsed.data
+    const email = parsed.data.email.toLowerCase()
     const dateHiredRaw = formData.get('dateHired') as string
-    const bio = (formData.get('bio') as string)?.trim() || null
-    const qualifications = (formData.get('qualifications') as string)?.trim() || null
-
-    if (!firstName || !lastName || !email) {
-      return { success: false, error: 'First name, last name, and email are required.' }
-    }
 
     const fieldError = checkPersonFields({ email, dateHired: dateHiredRaw })
     if (fieldError) return { success: false, error: fieldError }
@@ -86,20 +96,14 @@ export async function updateStaffAction(id: string, formData: FormData): Promise
     const staff = await db.staff.findUnique({ where: { id }, include: { user: true } })
     if (!staff) return { success: false, error: 'Staff member not found.' }
 
-    const firstName = (formData.get('firstName') as string)?.trim()
-    const lastName = (formData.get('lastName') as string)?.trim()
-    const email = (formData.get('email') as string)?.trim().toLowerCase()
-    const phone = (formData.get('phone') as string)?.trim() || null
-    const jobTitle = (formData.get('jobTitle') as string)?.trim() || null
-    const department = (formData.get('department') as string)?.trim() || null
-    const employmentType = (formData.get('employmentType') as string) || 'full-time'
+    const parsed = parseWith(staffFieldsSchema, {
+      ...formRecord(formData),
+      employmentType: String(formData.get('employmentType') || 'full-time'),
+    })
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const { firstName, lastName, phone, jobTitle, department, employmentType, bio, qualifications } = parsed.data
+    const email = parsed.data.email.toLowerCase()
     const dateHiredRaw = formData.get('dateHired') as string
-    const bio = (formData.get('bio') as string)?.trim() || null
-    const qualifications = (formData.get('qualifications') as string)?.trim() || null
-
-    if (!firstName || !lastName || !email) {
-      return { success: false, error: 'First name, last name, and email are required.' }
-    }
 
     const fieldError = checkPersonFields({ email, dateHired: dateHiredRaw })
     if (fieldError) return { success: false, error: fieldError }

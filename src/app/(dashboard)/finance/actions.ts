@@ -9,6 +9,15 @@ import { redirect } from 'next/navigation'
 import { sendEmail, invoiceEmailHtml } from '@/lib/email'
 import { field, parseWith } from '@/lib/form'
 import { sendFeeReminders } from '@/lib/fee-reminders'
+import { z } from 'zod'
+
+const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'cheque', 'online'] as const
+
+const paymentDetailsSchema = z.object({
+  method: field.oneOf('Payment method', PAYMENT_METHODS),
+  reference: field.optional('Reference', 120),
+  notes: field.optional('Notes', 1000),
+})
 
 // ─── Fee Types ────────────────────────────────────────────────────────────────
 
@@ -19,6 +28,8 @@ export async function createFeeTypeAction(formData: FormData): Promise<{ success
     const name = (formData.get('name') as string)?.trim()
     const description = (formData.get('description') as string)?.trim() || null
     const amountRaw = formData.get('amount') as string
+    if (name && name.length > 120) return { success: false, error: 'Name must be 120 characters or fewer.' }
+    if (description && description.length > 500) return { success: false, error: 'Description must be 500 characters or fewer.' }
     const frequencyParsed = parseWith(field.oneOf('Frequency', ['annual', 'term'] as const), (formData.get('frequency') as string | null) || 'annual')
     if (!frequencyParsed.ok) return { success: false, error: frequencyParsed.error }
     const frequency = frequencyParsed.data
@@ -65,6 +76,8 @@ export async function updateFeeTypeAction(
     const name = (formData.get('name') as string)?.trim()
     const description = (formData.get('description') as string)?.trim() || null
     const amountRaw = formData.get('amount') as string
+    if (name && name.length > 120) return { success: false, error: 'Name must be 120 characters or fewer.' }
+    if (description && description.length > 500) return { success: false, error: 'Description must be 500 characters or fewer.' }
     const frequencyParsed = parseWith(field.oneOf('Frequency', ['annual', 'term'] as const), (formData.get('frequency') as string | null) || 'annual')
     if (!frequencyParsed.ok) return { success: false, error: frequencyParsed.error }
     const frequency = frequencyParsed.data
@@ -117,6 +130,16 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
 
     if (!studentId || !dueDateRaw) {
       return { success: false, error: 'Student and due date are required.' }
+    }
+    if (notes && notes.length > 2000) return { success: false, error: 'Notes must be 2000 characters or fewer.' }
+    if (itemDescriptions.length > 100) return { success: false, error: 'An invoice can have at most 100 line items.' }
+    if (itemDescriptions.some(d => !d.trim() || d.trim().length > 200)) {
+      return { success: false, error: 'Each line item needs a description of 200 characters or fewer.' }
+    }
+    if (notes && notes.length > 2000) return { success: false, error: 'Notes must be 2000 characters or fewer.' }
+    if (itemDescriptions.length > 100) return { success: false, error: 'An invoice can have at most 100 line items.' }
+    if (itemDescriptions.some(d => !d.trim() || d.trim().length > 200)) {
+      return { success: false, error: 'Each line item needs a description of 200 characters or fewer.' }
     }
     const dueParsed = parseWith(field.date('Due date'), dueDateRaw)
     if (!dueParsed.ok) return { success: false, error: dueParsed.error }
@@ -203,6 +226,9 @@ export async function recordPaymentAction(
     if (amountCents === null || amountCents <= 0) {
       return { success: false, error: 'Payment amount must be greater than zero, with at most two decimal places.' }
     }
+
+    const parsed = parseWith(paymentDetailsSchema, { method, reference, notes })
+    if (!parsed.ok) return { success: false, error: parsed.error }
 
     // Atomic increment inside a transaction: concurrent payments cannot overwrite each other's totals
     const outcome = await db.$transaction(async (tx) => {

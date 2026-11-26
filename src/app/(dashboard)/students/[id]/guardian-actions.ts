@@ -4,6 +4,19 @@ import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
 import { hashPassword, requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { field, formRecord, parseWith } from '@/lib/form'
+import { checkPersonFields } from '@/lib/validation'
+
+const guardianSchema = z.object({
+  firstName: field.required('First name', 100),
+  lastName: field.required('Last name', 100),
+  email: field.required('Email', 254),
+  phone: field.optional('Phone', 40),
+  relationship: field.optional('Relationship', 60),
+  occupation: field.optional('Occupation', 120),
+  workPhone: field.optional('Work phone', 40),
+})
 
 function generateTempPassword(): string {
   return randomBytes(9).toString('base64url').slice(0, 12)
@@ -15,18 +28,14 @@ export async function createAndLinkParentAction(
 ): Promise<{ success: boolean; error?: string; tempPassword?: string; parentName?: string }> {
   await requireRole(['admin'])
 
-  const firstName = (formData.get('firstName') as string)?.trim()
-  const lastName = (formData.get('lastName') as string)?.trim()
-  const email = (formData.get('email') as string)?.trim().toLowerCase()
-  const phone = (formData.get('phone') as string)?.trim() || null
-  const relationship = (formData.get('relationship') as string)?.trim() || null
-  const occupation = (formData.get('occupation') as string)?.trim() || null
-  const workPhone = (formData.get('workPhone') as string)?.trim() || null
+  const parsed = parseWith(guardianSchema, formRecord(formData))
+  if (!parsed.ok) return { success: false, error: parsed.error }
+  const { firstName, lastName, phone, relationship, occupation, workPhone } = parsed.data
+  const email = parsed.data.email.toLowerCase()
   const isPrimary = formData.get('isPrimary') === 'true'
 
-  if (!firstName || !lastName || !email) {
-    return { success: false, error: 'First name, last name, and email are required.' }
-  }
+  const emailError = checkPersonFields({ email })
+  if (emailError) return { success: false, error: emailError }
 
   const student = await db.student.findUnique({ where: { id: studentId } })
   if (!student) return { success: false, error: 'Student not found.' }
@@ -76,10 +85,13 @@ export async function linkExistingParentAction(
 ): Promise<{ success: boolean; error?: string }> {
   await requireRole(['admin'])
 
-  const email = (formData.get('email') as string)?.trim().toLowerCase()
+  const parsed = parseWith(z.object({ email: field.required('Email', 254) }), formRecord(formData))
+  if (!parsed.ok) return { success: false, error: parsed.error }
+  const email = parsed.data.email.toLowerCase()
   const isPrimary = formData.get('isPrimary') === 'true'
 
-  if (!email) return { success: false, error: 'Email is required.' }
+  const emailError = checkPersonFields({ email })
+  if (emailError) return { success: false, error: emailError }
 
   const student = await db.student.findUnique({ where: { id: studentId } })
   if (!student) return { success: false, error: 'Student not found.' }

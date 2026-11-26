@@ -105,10 +105,10 @@ function RoomRow({ room, onEditDone }: { room: Room; onEditDone: () => void }) {
         {room.capacity && <span className="text-xs text-slate-400 shrink-0">Cap. {room.capacity}</span>}
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-        <Button type="button" variant="ghost" size="icon-xs" onClick={() => setEditing(true)} title="Edit">
+        <Button type="button" variant="ghost" size="icon-xs" onClick={() => setEditing(true)} title="Edit" aria-label="Edit">
           <Pencil className="h-3.5 w-3.5" />
         </Button>
-        <Button type="button" variant="ghost" size="icon-xs" className="text-slate-400 hover:text-destructive" onClick={handleDelete} disabled={isPending} title="Delete">
+        <Button type="button" variant="ghost" size="icon-xs" className="text-slate-400 hover:text-destructive" onClick={handleDelete} disabled={isPending} title="Delete" aria-label="Delete">
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>

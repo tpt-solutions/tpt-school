@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { teachesClass } from '@/lib/access'
+import { queryDate } from '@/lib/form'
 import { checkTruancy } from '@/lib/truancy'
 import { notifyGuardiansOfAbsences } from '@/lib/absence-notify'
 
@@ -140,12 +141,14 @@ export interface AttendanceFilters {
 export async function getAttendanceReport(filters: AttendanceFilters) {
   await requireRole(['admin'])
 
-  const startDate = filters.startDate ? new Date(filters.startDate) : undefined
-  const endDate = filters.endDate ? new Date(filters.endDate) : undefined
-  if ((startDate && Number.isNaN(startDate.getTime())) || (endDate && Number.isNaN(endDate.getTime()))) {
-    throw new Error('Invalid date filter')
-  }
+  // Invalid dates are ignored (as on the report page) rather than crashing the request
+  const startDate = queryDate(filters.startDate)
+  const endDate = queryDate(filters.endDate)
   if (endDate) endDate.setHours(23, 59, 59, 999)
+  // IDs come from the UI, but cap their length before they reach a query
+  if ((filters.studentId ?? '').length > 64 || (filters.classId ?? '').length > 64) {
+    throw new Error('Invalid filter')
+  }
 
   // If filtering by classId, get enrolled student IDs
   let studentIds: string[] | undefined

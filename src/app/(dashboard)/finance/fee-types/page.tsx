@@ -47,7 +47,8 @@ export default async function FeeTypesPage() {
         <div className="lg:col-span-2">
           {feeTypes.length === 0 ? (
             <div className="text-center py-16 text-slate-400 border border-dashed border-slate-200 rounded-lg">
-              No fee types defined yet.
+              <p>No fee types defined yet.</p>
+              <p className="mt-1 text-sm">Use the form to add the first one. Invoices are built from fee types.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-slate-100">

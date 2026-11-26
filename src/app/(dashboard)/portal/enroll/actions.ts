@@ -28,6 +28,9 @@ export async function submitEnrolmentRequestAction(
   if (message && message.trim().length > 1000) {
     return { success: false, error: 'Message must be 1000 characters or fewer.' }
   }
+  if (!classId || classId.length > 64) return { success: false, error: 'Choose a class.' }
+  const cls = await db.class.findUnique({ where: { id: classId }, select: { id: true } })
+  if (!cls) return { success: false, error: 'That class could not be found.' }
 
   const existing = await db.enrolmentRequest.findUnique({
     where: { classId_studentId: { classId, studentId } },
@@ -113,9 +116,13 @@ export async function joinWaitlistAction(
 ): Promise<{ success: boolean; error?: string }> {
   const session = await requireSession()
   if (session.role !== 'student') return { success: false, error: 'Only students can join the waitlist.' }
+  if (!classId || classId.length > 64) return { success: false, error: 'Choose a class.' }
 
   const student = await db.student.findUnique({ where: { userId: session.id } })
   if (!student) return { success: false, error: 'Student profile not found.' }
+
+  const cls = await db.class.findUnique({ where: { id: classId }, select: { id: true } })
+  if (!cls) return { success: false, error: 'That class could not be found.' }
 
   const existing = await db.waitlistEntry.findUnique({
     where: { classId_studentId: { classId, studentId: student.id } },
