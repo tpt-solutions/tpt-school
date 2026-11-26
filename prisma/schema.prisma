@@ -63,6 +63,7 @@ model SchoolSettings {
   id             String   @id @default(cuid())
   name           String
   shortName      String?
+  country        String?  // nz | au | uk | ca | other: sets default term structure at setup
   address        String?
   phone          String?
   email          String?
@@ -150,6 +151,10 @@ model Staff {
   timetableRequirements   TimetableRequirement[]
   leaveRequests           LeaveRequest[]
   attendance              StaffAttendance[]
+  substitutesAbsent       SubstituteCover[]    @relation("SubstituteAbsentStaff")
+  substitutesCovering     SubstituteCover[]    @relation("SubstituteCoverStaff")
+  interviewSlots          InterviewSlot[]
+  payLines                PayLine[]
 }
 
 model LeaveRequest {
@@ -221,6 +226,12 @@ model Student {
   notes               StudentNote[]
   waitlistEntries     WaitlistEntry[]
   enrolmentRequests   EnrolmentRequest[]
+  healthVisits        HealthVisit[]
+  transports          StudentTransport[]
+  canteenPurchases    CanteenPurchase[]
+  libraryLoans        LibraryLoan[]
+  meritAwards         MeritAward[]
+  interviewSlots      InterviewSlot[]
 }
 
 model Parent {
@@ -324,6 +335,7 @@ model Class {
   timetableRequirements TimetableRequirement[]
 
   @@unique([academicYearId, code])
+  substituteCovers SubstituteCover[]
 }
 
 model ClassTeacher {
@@ -786,4 +798,196 @@ model LoginAttempt {
 
   @@index([email, createdAt])
   @@index([ip, createdAt])
+}
+
+// ─── Substitutes ──────────────────────────────────────────────────────────────
+
+model SubstituteCover {
+  id            String   @id @default(cuid())
+  date          DateTime
+  periodLabel   String?
+  classId       String?
+  absentStaffId String
+  coverStaffId  String?
+  status        String   @default("open") // open | covered | cancelled
+  notes         String?
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  absentStaff   Staff    @relation("SubstituteAbsentStaff", fields: [absentStaffId], references: [id])
+  coverStaff    Staff?   @relation("SubstituteCoverStaff", fields: [coverStaffId], references: [id])
+  class         Class?   @relation(fields: [classId], references: [id])
+
+  @@index([date])
+}
+
+// ─── Transport ────────────────────────────────────────────────────────────────
+
+model TransportRoute {
+  id                  String   @id @default(cuid())
+  name                String
+  code                String   @unique
+  driverName          String?
+  vehicleRegistration String?
+  capacity            Int?
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+
+  students            StudentTransport[]
+}
+
+model StudentTransport {
+  id        String   @id @default(cuid())
+  studentId String
+  routeId   String
+  stop      String?
+  direction String   @default("both") // to_school | from_school | both
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  route     TransportRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, routeId])
+}
+
+// ─── Canteen ──────────────────────────────────────────────────────────────────
+
+model CanteenItem {
+  id         String           @id @default(cuid())
+  name       String
+  category   String           @default("food")
+  priceCents Int
+  active     Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+
+  purchases  CanteenPurchase[]
+}
+
+model CanteenPurchase {
+  id           String      @id @default(cuid())
+  studentId    String
+  itemId       String
+  quantity     Int         @default(1)
+  totalCents   Int
+  purchasedAt  DateTime    @default(now())
+  recordedById String
+
+  student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  item         CanteenItem @relation(fields: [itemId], references: [id])
+
+  @@index([studentId])
+}
+
+// ─── Library ──────────────────────────────────────────────────────────────────
+
+model LibraryBook {
+  id        String   @id @default(cuid())
+  title     String
+  author    String?
+  isbn      String?  @unique
+  category  String?
+  copies    Int      @default(1)
+  createdAt DateTime @default(now())
+
+  loans     LibraryLoan[]
+}
+
+model LibraryLoan {
+  id           String      @id @default(cuid())
+  bookId       String
+  studentId    String
+  loanedAt     DateTime    @default(now())
+  dueDate      DateTime
+  returnedAt   DateTime?
+  recordedById String
+
+  book         LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, returnedAt])
+  @@index([studentId])
+}
+
+// ─── Health ───────────────────────────────────────────────────────────────────
+
+model HealthVisit {
+  id             String   @id @default(cuid())
+  studentId      String
+  visitedAt      DateTime @default(now())
+  reason         String
+  treatment      String?
+  sentHome       Boolean  @default(false)
+  parentNotified Boolean  @default(false)
+  recordedById   String
+  createdAt      DateTime @default(now())
+
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+// ─── Parent-teacher interviews ────────────────────────────────────────────────
+
+model InterviewSlot {
+  id          String   @id @default(cuid())
+  staffId     String
+  startsAt    DateTime
+  endsAt      DateTime
+  studentId   String?
+  notes       String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  staff       Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  student     Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([staffId, startsAt])
+}
+
+// ─── Merit awards ─────────────────────────────────────────────────────────────
+
+model MeritAward {
+  id          String   @id @default(cuid())
+  studentId   String
+  points      Int
+  reason      String
+  awardedById String
+  awardedAt   DateTime @default(now())
+
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+// ─── Pay records (record-keeping only; no tax calculation) ────────────────────
+
+model PayRun {
+  id           String    @id @default(cuid())
+  label        String
+  periodStart  DateTime
+  periodEnd    DateTime
+  payDate      DateTime
+  status       String    @default("draft") // draft | paid
+  paidAt       DateTime?
+  createdById  String
+  createdAt    DateTime  @default(now())
+
+  lines        PayLine[]
+}
+
+model PayLine {
+  id         String   @id @default(cuid())
+  payRunId   String
+  staffId    String
+  grossCents Int
+  netCents   Int
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  payRun     PayRun   @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  staff      Staff    @relation(fields: [staffId], references: [id])
+
+  @@unique([payRunId, staffId])
 }
