@@ -1,5 +1,6 @@
 import { requireSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { computeStudentRisks, type RiskLevel, type StudentRisk } from '@/lib/risk'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { OnboardingChecklist, type OnboardingCounts } from '@/components/onboarding-checklist'
 import Link from 'next/link'
@@ -146,6 +147,58 @@ const FLAG_LABELS: Record<RiskFlag, { label: string; className: string }> = {
   grades:     { label: 'Declining Grades', className: 'bg-amber-100 text-amber-700' },
 }
 
+/** Admin view: the 10 highest early-warning scores at medium level or above. */
+async function getAdminRisks(): Promise<StudentRisk[]> {
+  const all = await computeStudentRisks()
+  return all.filter(r => r.result.level !== 'low').slice(0, 10)
+}
+
+const RISK_LEVEL_CLASS: Record<RiskLevel, string> = {
+  high: 'bg-red-100 text-red-700',
+  medium: 'bg-amber-100 text-amber-700',
+  low: 'bg-slate-100 text-slate-600',
+}
+
+function RiskWidget({ students }: { students: StudentRisk[] }) {
+  if (students.length === 0) return null
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <AlertTriangle className="w-5 h-5 text-amber-500" />
+        Early-warning students
+      </h2>
+      <Card className="border-slate-100 shadow-sm">
+        <CardContent className="p-0">
+          <div className="divide-y divide-slate-100">
+            {students.map(s => (
+              <div key={s.studentId} className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/students/${s.studentId}`}
+                      className="text-sm font-medium text-slate-900 hover:text-primary hover:underline truncate"
+                    >
+                      {s.name}
+                    </Link>
+                    {s.yearLevel != null && <span className="text-xs text-slate-400 shrink-0">Yr {s.yearLevel}</span>}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">{s.result.reasons.join(' · ') || 'No specific signals'}</p>
+                </div>
+                <span
+                  className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${RISK_LEVEL_CLASS[s.result.level]}`}
+                  aria-label={`Risk ${s.result.level}, score ${s.result.score} out of 100`}
+                >
+                  {s.result.level} · {s.result.score}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function AtRiskWidget({ students }: { students: AtRiskStudent[] }) {
   if (students.length === 0) return null
   return (
@@ -223,9 +276,9 @@ export default async function DashboardPage() {
     'Good evening'
 
   if (user.role === 'admin') {
-    const [stats, atRiskStudents, onboarding] = await Promise.all([
+    const [stats, riskStudents, onboarding] = await Promise.all([
       getAdminStats(),
-      getAtRiskStudents(),
+      getAdminRisks(),
       getOnboardingCounts(),
     ])
     return (
@@ -274,8 +327,8 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* At-risk widget */}
-        <AtRiskWidget students={atRiskStudents} />
+        {/* Early-warning widget */}
+        <RiskWidget students={riskStudents} />
 
         {/* Quick links */}
         <div>
