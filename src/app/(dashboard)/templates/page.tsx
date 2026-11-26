@@ -21,6 +21,24 @@ const TEMPLATES = [
     description: 'Creates staff accounts. Import from Staff → Import.',
     required: ['firstName', 'lastName', 'email'],
   },
+  {
+    file: 'classes-template.csv',
+    title: 'Class import',
+    description: 'Creates classes in the active academic year. Import from Classes → Import.',
+    required: ['name', 'code'],
+  },
+  {
+    file: 'enrolments-template.csv',
+    title: 'Enrolment import',
+    description: 'Enrols students in classes of the active year. Import from Classes → Enrol students.',
+    required: ['studentCode', 'classCode'],
+  },
+  {
+    file: 'fee-types-template.csv',
+    title: 'Fee type import',
+    description: 'Creates fee types with amounts in dollars. Import from Finance → Fee Types → Import.',
+    required: ['name', 'amount'],
+  },
 ]
 
 async function readPreview(file: string): Promise<string[][]> {
@@ -38,7 +56,7 @@ export default async function TemplatesPage() {
         <h1 className="text-2xl font-bold text-slate-900">Import templates</h1>
         <p className="text-sm text-slate-500 mt-0.5">
           Download a sample file, replace the example rows with your data, then upload it on the matching import page.
-          Commas inside values are not supported; keep each value free of commas.
+          Wrap any value that contains a comma in double quotes, for example &quot;Maths, Year 7&quot;.
         </p>
       </div>
 

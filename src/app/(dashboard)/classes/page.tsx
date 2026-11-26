@@ -52,10 +52,18 @@ export default async function ClassesPage({ searchParams }: PageProps) {
           </p>
         </div>
         {user.role === 'admin' && (
-          <Link href="/classes/new" className={buttonVariants()}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Class
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/classes/import" className={buttonVariants({ variant: 'outline' })}>
+              Import classes
+            </Link>
+            <Link href="/classes/enrolments/import" className={buttonVariants({ variant: 'outline' })}>
+              Enrol students
+            </Link>
+            <Link href="/classes/new" className={buttonVariants()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Class
+            </Link>
+          </div>
         )}
       </div>
 
@@ -95,6 +103,9 @@ export default async function ClassesPage({ searchParams }: PageProps) {
                 <TableCell colSpan={8} className="text-center py-12 text-slate-400">
                   <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
                   <p>No classes found</p>
+                  <Link href="/classes/new" className={buttonVariants({ size: 'sm' }) + ' mt-3'}>
+                    <Plus className="w-4 h-4 mr-1" /> Add a class
+                  </Link>
                 </TableCell>
               </TableRow>
             ) : (
