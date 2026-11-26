@@ -3,6 +3,7 @@ import { requireSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import DashboardHeader from '@/components/nav/header'
 import SidebarNav from '@/components/nav/sidebar'
+import CommandPalette from '@/components/nav/command-palette'
 import { GraduationCap } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -20,6 +21,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
+      <CommandPalette role={user.role} />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow focus:outline-none focus:ring-2 focus:ring-primary"
