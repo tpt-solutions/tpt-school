@@ -14,8 +14,11 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
       DISABLE_SCHEDULER: ${DISABLE_SCHEDULER:-false}
+      DISABLE_BACKUPS: ${DISABLE_BACKUPS:-false}
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-7}
       # Always inside the persisted volume, regardless of what .env says.
       DATABASE_URL: file:/app/data/tpt.db
+      BACKUP_DIR: /app/data/backups
     volumes:
       - tpt-data:/app/data
     healthcheck:

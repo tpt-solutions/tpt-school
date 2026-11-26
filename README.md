@@ -164,13 +164,18 @@ All variables are documented with comments in [`.env.example`](.env.example).
 | `NEXT_PUBLIC_BASE_URL` | Recommended | Public site URL used in email links. |
 | `CRON_SECRET` | If using the HTTP cron endpoint | Bearer token for `/api/cron/fee-reminders`. Endpoint is disabled when unset. |
 | `DISABLE_SCHEDULER` | No | `true` turns off the built-in daily fee-reminder job. |
+| `DISABLE_BACKUPS` | No | `true` turns off the built-in daily database snapshot. |
+| `BACKUP_DIR` | No | Folder for scheduled snapshots. Defaults to `./backups`. |
+| `BACKUP_RETENTION` | No | How many snapshots to keep. Defaults to `7`. |
 | `ALLOWED_ORIGINS` | Behind a proxy | Extra origins allowed to call server actions. |
 | `TRUST_PROXY` | Behind a proxy | `true` to read the client IP from `X-Forwarded-For` (rate limiting). Only enable behind a proxy that overwrites that header. |
 | `PORT` / `HOSTNAME` | No | Bind address, default `3000` / `0.0.0.0` in Docker. |
 
 ## Backups
 
-All data is in one SQLite file, so backups are a file copy taken while the app is running or stopped.
+All data is in one SQLite file. The app takes a **scheduled snapshot once a day** using SQLite's `VACUUM INTO`, which is consistent even while the app is writing. Snapshots go to `BACKUP_DIR` (default `./backups`; the Docker setup uses `/app/data/backups` inside the persisted volume), and the newest `BACKUP_RETENTION` files are kept (default 7). Copy them off the server.
+
+You can also take a manual backup:
 
 ```bash
 # Docker: stop the app so the file is consistent, copy it out, restart

@@ -45,3 +45,4 @@ next-env.d.ts
 # local database (contains user data and password hashes)
 dev.db
 dev.db-journal
+backups/
