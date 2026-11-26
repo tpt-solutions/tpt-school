@@ -9,6 +9,8 @@ import AiForm from './ai-form'
 import AuditLogView from './audit-log'
 import RoomsForm from './rooms-form'
 import MessagingForm from './messaging-form'
+import RolloverForm from './rollover-form'
+import AbsenceEmailForm from './absence-email-form'
 
 export default async function SettingsPage() {
   const user = await requireRole(['admin'])
@@ -26,6 +28,15 @@ export default async function SettingsPage() {
     }),
     db.room.findMany({ orderBy: { name: 'asc' } }),
   ])
+
+  const activeYear = academicYears.find(y => y.active)
+  const activeYearForRollover = activeYear
+    ? {
+        year: activeYear.year,
+        startDate: activeYear.startDate.toISOString().slice(0, 10),
+        endDate: activeYear.endDate.toISOString().slice(0, 10),
+      }
+    : null
 
   const schoolSettings = {
     name: settings?.name ?? '',
@@ -70,8 +81,9 @@ export default async function SettingsPage() {
           <SettingsForm settings={schoolSettings} />
         </TabsContent>
 
-        <TabsContent value="academic" className="mt-6 max-w-3xl">
+        <TabsContent value="academic" className="mt-6 max-w-3xl space-y-6">
           <AcademicYearForm years={academicYears} />
+          <RolloverForm activeYear={activeYearForRollover} />
         </TabsContent>
 
         <TabsContent value="smtp" className="mt-6 max-w-2xl">
@@ -99,7 +111,10 @@ export default async function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="messaging" className="mt-6 max-w-2xl">
-          <MessagingForm parentMessagingDefault={settings?.parentMessagingDefault ?? true} />
+          <div className="space-y-4">
+            <MessagingForm parentMessagingDefault={settings?.parentMessagingDefault ?? true} />
+            <AbsenceEmailForm enabled={settings?.absenceEmailsEnabled ?? false} />
+          </div>
         </TabsContent>
 
         <TabsContent value="audit" className="mt-6">
