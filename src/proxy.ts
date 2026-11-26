@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
   '/icons',
   // Calendar apps fetch this without cookies. The route checks its own signed token.
   '/api/calendar/feed',
+  // Stripe calls this without a session. The route verifies the webhook signature itself.
+  '/api/stripe/webhook',
 ]
 
 /** Matches the path exactly or as a whole segment prefix: '/login' and '/login/x' match, '/loginfoo' does not. */
