@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
 import { hashPassword, requireRole } from '@/lib/auth'
+import { nextEmployeeId, withIdRetry } from '@/lib/ids'
 import { revalidatePath } from 'next/cache'
 
 export type ImportStaffRow = {
@@ -22,10 +23,6 @@ export type ImportResult = {
   errors: string[]
 }
 
-async function generateEmployeeId(): Promise<string> {
-  const count = await db.staff.count()
-  return `EMP-${String(count + 1).padStart(4, '0')}`
-}
 
 export async function importStaffAction(rows: ImportStaffRow[]): Promise<ImportResult> {
   await requireRole(['admin'])
@@ -46,13 +43,12 @@ export async function importStaffAction(rows: ImportStaffRow[]): Promise<ImportR
       const name = `${row.firstName.trim()} ${row.lastName.trim()}`
       const tempPassword = randomBytes(9).toString('base64url').slice(0, 12)
       const passwordHash = await hashPassword(tempPassword)
-      const employeeId = await generateEmployeeId()
-
-      const user = await db.user.create({
-        data: { email, passwordHash, name, role: 'teacher', active: true },
-      })
-
-      await db.staff.create({
+      await withIdRetry(() => db.$transaction(async (tx) => {
+        const employeeId = await nextEmployeeId(tx)
+        const user = await tx.user.create({
+          data: { email, passwordHash, name, role: 'teacher', active: true },
+        })
+        await tx.staff.create({
         data: {
           userId: user.id,
           employeeId,
@@ -61,7 +57,8 @@ export async function importStaffAction(rows: ImportStaffRow[]): Promise<ImportR
           employmentType: row.employmentType || 'full-time',
           dateHired: row.dateHired ? new Date(row.dateHired) : null,
         },
-      })
+        })
+      }))
 
       imported++
     } catch (err) {

@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { ClassFullError, appendToWaitlistTx, enrolInTx, renumberWaitlistTx } from '@/lib/enrolment'
 
 export async function createClassAction(formData: FormData) {
   await requireRole(['admin'])
@@ -104,12 +105,11 @@ export async function enrollStudentAction(classId: string, studentId: string) {
   await requireRole(['admin'])
 
   try {
-    await db.classEnrolment.create({
-      data: { classId, studentId, status: 'active' },
-    })
+    await db.$transaction(tx => enrolInTx(tx, classId, studentId))
     revalidatePath(`/classes/${classId}`)
     return { success: true }
   } catch (e: unknown) {
+    if (e instanceof ClassFullError) return { error: e.message }
     const msg = e instanceof Error ? e.message : 'Failed to enrol student'
     if (msg.includes('Unique constraint')) return { error: 'Student is already enrolled in this class' }
     return { error: msg }
@@ -146,11 +146,9 @@ export async function addToWaitlistAction(
   const enrolled = await db.classEnrolment.findUnique({ where: { classId_studentId: { classId, studentId } } })
   if (enrolled) return { success: false, error: 'Student is already enrolled in this class.' }
 
-  const lastEntry = await db.waitlistEntry.findFirst({ where: { classId }, orderBy: { position: 'desc' } })
-  const position = (lastEntry?.position ?? 0) + 1
-
   try {
-    await db.waitlistEntry.create({ data: { classId, studentId, position, notes: notes || null } })
+    // Position is assigned inside the transaction so concurrent joins get distinct positions
+    await db.$transaction(tx => appendToWaitlistTx(tx, classId, studentId, notes || null))
     revalidatePath(`/classes/${classId}`)
     return { success: true }
   } catch {
@@ -165,12 +163,10 @@ export async function removeFromWaitlistAction(
   await requireRole(['admin'])
 
   try {
-    await db.waitlistEntry.delete({ where: { id: entryId } })
-    // Re-number remaining entries
-    const remaining = await db.waitlistEntry.findMany({ where: { classId }, orderBy: { position: 'asc' } })
-    for (let i = 0; i < remaining.length; i++) {
-      await db.waitlistEntry.update({ where: { id: remaining[i].id }, data: { position: i + 1 } })
-    }
+    await db.$transaction(async tx => {
+      await tx.waitlistEntry.delete({ where: { id: entryId } })
+      await renumberWaitlistTx(tx, classId)
+    })
     revalidatePath(`/classes/${classId}`)
     return { success: true }
   } catch {
@@ -188,18 +184,15 @@ export async function promoteFromWaitlistAction(
   if (!entry) return { success: false, error: 'Waitlist entry not found.' }
 
   try {
-    await db.$transaction([
-      db.classEnrolment.create({ data: { classId, studentId: entry.studentId, status: 'active' } }),
-      db.waitlistEntry.delete({ where: { id: entryId } }),
-    ])
-    // Re-number remaining
-    const remaining = await db.waitlistEntry.findMany({ where: { classId }, orderBy: { position: 'asc' } })
-    for (let i = 0; i < remaining.length; i++) {
-      await db.waitlistEntry.update({ where: { id: remaining[i].id }, data: { position: i + 1 } })
-    }
+    await db.$transaction(async tx => {
+      await enrolInTx(tx, classId, entry.studentId)
+      await tx.waitlistEntry.delete({ where: { id: entryId } })
+      await renumberWaitlistTx(tx, classId)
+    })
     revalidatePath(`/classes/${classId}`)
     return { success: true }
   } catch (e: unknown) {
+    if (e instanceof ClassFullError) return { success: false, error: e.message }
     const msg = e instanceof Error ? e.message : 'Failed to promote from waitlist'
     if (msg.includes('Unique constraint')) return { success: false, error: 'Student is already enrolled.' }
     return { success: false, error: msg }
@@ -218,17 +211,18 @@ export async function approveEnrolmentRequestAction(
   if (request.status !== 'pending') return { success: false, error: 'Request is no longer pending.' }
 
   try {
-    await db.$transaction([
-      db.classEnrolment.create({ data: { classId: request.classId, studentId: request.studentId, status: 'active' } }),
-      db.enrolmentRequest.update({
+    await db.$transaction(async tx => {
+      await enrolInTx(tx, request.classId, request.studentId)
+      await tx.enrolmentRequest.update({
         where: { id: requestId },
         data: { status: 'approved', reviewedById: session.id, reviewedAt: new Date() },
-      }),
-    ])
+      })
+    })
     revalidatePath(`/classes/${request.classId}`)
     revalidatePath('/enrollment-requests')
     return { success: true }
   } catch (e: unknown) {
+    if (e instanceof ClassFullError) return { success: false, error: e.message }
     const msg = e instanceof Error ? e.message : 'Failed to approve request'
     if (msg.includes('Unique constraint')) return { success: false, error: 'Student is already enrolled.' }
     return { success: false, error: msg }

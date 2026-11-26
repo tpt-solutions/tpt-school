@@ -3,6 +3,7 @@
 import { db } from '@/lib/db'
 import { requireSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { appendToWaitlistTx } from '@/lib/enrolment'
 
 export async function submitEnrolmentRequestAction(
   classId: string,
@@ -114,10 +115,13 @@ export async function joinWaitlistAction(
   })
   if (existing) return { success: false, error: 'You are already on the waitlist for this class.' }
 
-  const lastEntry = await db.waitlistEntry.findFirst({ where: { classId }, orderBy: { position: 'desc' } })
-  const position = (lastEntry?.position ?? 0) + 1
-
-  await db.waitlistEntry.create({ data: { classId, studentId: student.id, position } })
+  try {
+    // Position is assigned inside the transaction so concurrent joins get distinct positions
+    await db.$transaction(tx => appendToWaitlistTx(tx, classId, student.id))
+  } catch {
+    // A double-submit trips the unique (classId, studentId) constraint
+    return { success: false, error: 'You are already on the waitlist for this class.' }
+  }
   revalidatePath('/portal/enroll')
   return { success: true }
 }

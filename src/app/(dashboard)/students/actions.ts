@@ -3,15 +3,12 @@
 import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
 import { hashPassword, requireRole } from '@/lib/auth'
+import { nextStudentId, withIdRetry } from '@/lib/ids'
+import { checkPersonFields } from '@/lib/validation'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-async function generateStudentId(): Promise<string> {
-  const count = await db.student.count()
-  return `STU-${String(count + 1).padStart(5, '0')}`
-}
 
 function generateTempPassword(): string {
   return randomBytes(9).toString('base64url').slice(0, 12)
@@ -47,6 +44,9 @@ export async function createStudentAction(formData: FormData): Promise<{ success
       return { success: false, error: 'First name, last name, and email are required.' }
     }
 
+    const fieldError = checkPersonFields({ email, dateOfBirth: dateOfBirthRaw, enrollmentDate: enrollmentDateRaw, yearLevel: yearLevelRaw })
+    if (fieldError) return { success: false, error: fieldError }
+
     const existing = await db.user.findUnique({ where: { email } })
     if (existing) {
       return { success: false, error: 'A user with this email already exists.' }
@@ -54,21 +54,15 @@ export async function createStudentAction(formData: FormData): Promise<{ success
 
     const tempPassword = generateTempPassword()
     const passwordHash = await hashPassword(tempPassword)
-    const studentId = await generateStudentId()
     const name = `${firstName} ${lastName}`
 
-    const user = await db.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-        role: 'student',
-        phone,
-        active: true,
-      },
-    })
-
-    const student = await db.student.create({
+    // User and profile are created in one transaction; the ID is read inside it and retried on collision
+    const student = await withIdRetry(() => db.$transaction(async (tx) => {
+      const studentId = await nextStudentId(tx)
+      const user = await tx.user.create({
+        data: { email, passwordHash, name, role: 'student', phone, active: true },
+      })
+      return tx.student.create({
       data: {
         userId: user.id,
         studentId,
@@ -88,7 +82,8 @@ export async function createStudentAction(formData: FormData): Promise<{ success
         emergencyPhone,
         emergencyRelation,
       },
-    })
+      })
+    }))
 
     revalidatePath('/students')
     return { success: true, id: student.id, tempPassword }
@@ -131,6 +126,9 @@ export async function updateStudentAction(id: string, formData: FormData): Promi
     if (!firstName || !lastName || !email) {
       return { success: false, error: 'First name, last name, and email are required.' }
     }
+
+    const fieldError = checkPersonFields({ email, dateOfBirth: dateOfBirthRaw, enrollmentDate: enrollmentDateRaw, yearLevel: yearLevelRaw })
+    if (fieldError) return { success: false, error: fieldError }
 
     // Check email uniqueness (excluding current user)
     if (email !== student.user.email) {

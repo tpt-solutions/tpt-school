@@ -3,16 +3,13 @@
 import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
 import { hashPassword, requireRole, requireSession } from '@/lib/auth'
+import { nextEmployeeId, withIdRetry } from '@/lib/ids'
+import { checkDateRange, checkPersonFields } from '@/lib/validation'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendEmail, leaveDecisionEmailHtml } from '@/lib/email'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-async function generateEmployeeId(): Promise<string> {
-  const count = await db.staff.count()
-  return `EMP-${String(count + 1).padStart(4, '0')}`
-}
 
 function generateTempPassword(): string {
   return randomBytes(9).toString('base64url').slice(0, 12)
@@ -39,6 +36,9 @@ export async function createStaffAction(formData: FormData): Promise<{ success: 
       return { success: false, error: 'First name, last name, and email are required.' }
     }
 
+    const fieldError = checkPersonFields({ email, dateHired: dateHiredRaw })
+    if (fieldError) return { success: false, error: fieldError }
+
     const existing = await db.user.findUnique({ where: { email } })
     if (existing) {
       return { success: false, error: 'A user with this email already exists.' }
@@ -46,21 +46,15 @@ export async function createStaffAction(formData: FormData): Promise<{ success: 
 
     const tempPassword = generateTempPassword()
     const passwordHash = await hashPassword(tempPassword)
-    const employeeId = await generateEmployeeId()
     const name = `${firstName} ${lastName}`
 
-    const user = await db.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-        role: 'teacher',
-        phone,
-        active: true,
-      },
-    })
-
-    const staff = await db.staff.create({
+    // User and profile are created in one transaction; the ID is read inside it and retried on collision
+    const staff = await withIdRetry(() => db.$transaction(async (tx) => {
+      const employeeId = await nextEmployeeId(tx)
+      const user = await tx.user.create({
+        data: { email, passwordHash, name, role: 'teacher', phone, active: true },
+      })
+      return tx.staff.create({
       data: {
         userId: user.id,
         employeeId,
@@ -71,7 +65,8 @@ export async function createStaffAction(formData: FormData): Promise<{ success: 
         bio,
         qualifications,
       },
-    })
+      })
+    }))
 
     revalidatePath('/staff')
     return { success: true, id: staff.id, tempPassword }
@@ -105,6 +100,9 @@ export async function updateStaffAction(id: string, formData: FormData): Promise
     if (!firstName || !lastName || !email) {
       return { success: false, error: 'First name, last name, and email are required.' }
     }
+
+    const fieldError = checkPersonFields({ email, dateHired: dateHiredRaw })
+    if (fieldError) return { success: false, error: fieldError }
 
     if (email !== staff.user.email) {
       const existing = await db.user.findUnique({ where: { email } })
@@ -169,6 +167,9 @@ export async function createLeaveRequestAction(
 
     const startDate = new Date(startDateRaw)
     const endDate = new Date(endDateRaw)
+
+    const rangeError = checkDateRange(startDateRaw, endDateRaw)
+    if (rangeError) return { success: false, error: rangeError }
 
     if (endDate < startDate) {
       return { success: false, error: 'End date cannot be before start date.' }
