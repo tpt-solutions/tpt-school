@@ -1,0 +1,29 @@
+services:
+  app:
+    build: .
+    image: tpt-school:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Values are read from .env in this directory (Compose substitutes them).
+      # AUTH_SECRET is required — startup fails with a clear message if it is missing.
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env (openssl rand -base64 32)}
+      CRON_SECRET: ${CRON_SECRET:-}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      DISABLE_SCHEDULER: ${DISABLE_SCHEDULER:-false}
+      # Always inside the persisted volume, regardless of what .env says.
+      DATABASE_URL: file:/app/data/tpt.db
+    volumes:
+      - tpt-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  tpt-data:

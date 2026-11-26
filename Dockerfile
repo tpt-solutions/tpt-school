@@ -42,6 +42,10 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/src/generated ./src/generated
 
+# Persistent SQLite location (mounted as a volume by docker-compose.yml)
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+ENV DATABASE_URL=file:/app/data/tpt.db
+
 # Entrypoint: run migrations then start
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
@@ -50,5 +54,8 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

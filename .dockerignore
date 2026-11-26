@@ -9,5 +9,7 @@ dev.db
 prisma/dev.db
 prisma/dev.db-wal
 prisma/dev.db-shm
-.env.local
-.env.development.local
+.env
+.env.*
+data
+docker-compose.yml
