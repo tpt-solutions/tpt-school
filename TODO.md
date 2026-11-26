@@ -45,6 +45,52 @@
 - [x] Electron installer wrapper (Windows .exe / Mac .dmg) (`electron/` wrapper with `electron-builder`)
 - [x] End-to-end test (setup wizard → login → all modules) (`tests/e2e/` with Playwright, 10 test files)
 
+## Phase 8: Security & Correctness (from 2026-11-26 review)
+- [x] `src/lib/auth.ts` has `"use server"` — every export is a public endpoint (`createSession` can mint sessions). Remove the directive, add `server-only`
+- [x] Add authorization to `staff/actions.ts` (create/update, leave approve — `approvedBy` from session)
+- [x] Add authorization to `students/actions.ts` (create/update/delete/search)
+- [x] Add authorization to `behaviour/actions.ts` (`checkTruancyAction` is unauthenticated, `resolveTruancyAlertAction`)
+- [x] Add authorization to `communication/actions.ts` (who may message whom, who may post notices)
+- [x] Teacher-must-teach-class checks in `grades/actions.ts`, `attendance/actions.ts`, and `api/report-card/[studentId]` (helper `assertTeachesClass`)
+- [x] Untrack `dev.db`, add to `.gitignore`, purge history, rotate seeded credentials — _done locally: dev.db and seeded passwords removed from all commits; live accounts rotated (credentials kept outside the repo). Remote `origin/master` NOT yet force-pushed: needs approval, and collaborators must re-clone_
+- [x] `api/cron/fee-reminders` fails open when `CRON_SECRET` is unset — return 401
+- [x] `src/lib/crypto.ts` falls back to a hardcoded key — throw in production when `AUTH_SECRET` is missing
+- [x] Password reset: hash the token, rate-limit requests, stop storing reset URL in `EmailLog.body`, escape HTML, revoke sessions
+- [x] Setup wizard: make first-admin creation atomic
+- [x] Rate limiting: stop trusting `x-forwarded-for`; add limits to attendance-code entry and reset requests
+- [x] Races: transactions for payments, enrolment capacity, waitlist position, ID generation (`count()+1`)
+- [ ] Validation: zod schemas for actions; reject invalid dates, NaN, `javascript:` URLs; enforce `score <= maxScore`; integer-cents money — _partial: zod-based checks for student/staff/leave inputs, gradebook score/URL checks, money stored as integer cents; other actions still need zod_
+- [x] Middleware (`src/proxy.ts`): fix path prefix matching; add security headers and `serverActions.allowedOrigins`
+- [ ] Schema indexes on Session, Attendance, Grade, FeeInvoice, FeePayment, BehaviourIncident, ClassEnrolment, MessageRecipient, EmailLog; add pagination to large lists — _partial: indexes added (migration `20261126000000_add_hot_path_indexes`, verified against schema); students list paginated; other large lists still open_
+- [ ] Audit logging for logins, role changes, grade edits, payments, settings — _partial: logins, grade edits, payments, settings, student deactivation logged; no role-change code path exists to audit yet_
+- [x] Teacher dashboard `myStudents` / `todayAttendance` hardcoded to 0 (`dashboard/page.tsx:46`)
+- [x] Delete stale `TODO copy.md`
+
+## Phase 9: Adoption
+- [ ] Add `.env.example`, `docker-compose.yml` (DB volume + cron), Dockerfile `HEALTHCHECK`
+- [ ] Fix README (Vercel claim is wrong — SQLite only; add backup guidance; document all env vars)
+- [ ] In-process scheduler for fee reminders (`instrumentation.ts` + node-cron)
+- [ ] Setup wizard: academic year/terms step, SMTP test, optional demo data, generated admin password (no fixed seed passwords)
+- [ ] Downloadable CSV templates + example preview on each importer; `/templates` sample files
+- [ ] School-type presets (primary/secondary, NZ/AU/UK/CA)
+- [ ] Importers for classes, enrolments, guardians, fee types, timetable
+- [ ] Admin dashboard onboarding checklist; empty states with call-to-action
+- [ ] `docs/` quick-start, admin and teacher guides
+
+## Phase 10: Usability & Automation (roadmap)
+- [ ] `loading.tsx`, `error.tsx`, `not-found.tsx`
+- [ ] Sort/filter/paginate lists; bulk actions with row checkboxes
+- [ ] Mobile card layout for wide tables; dark-mode toggle (mount `next-themes` provider)
+- [ ] Accessibility pass (skip link, table captions, focus management)
+- [ ] Command palette (Ctrl+K)
+- [ ] Parent portal: grades, invoices, report cards
+- [ ] Same-day absence emails to guardians; email queue with retry
+- [ ] Academic-year rollover and class promotion
+- [ ] Recurring invoices and overdue escalation; scheduled backups
+- [ ] iCal feed for calendar; timetable auto-generation
+- [ ] Missing modules: interview booking, health log, substitutes, library, transport, canteen, payroll, online payments, merit awards
+- [ ] AI report-card comment drafting; early-warning risk scoring
+
 ---
 
-_Last updated: 2026-05-22 — Phase 7 complete_
+_Last updated: 2026-11-26 — Phase 8–10 added from review; Phase 7 complete_
