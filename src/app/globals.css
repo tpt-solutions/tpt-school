@@ -147,3 +147,82 @@
     @apply font-sans;
   }
 }
+/* ─── Dark mode for hardcoded colours ───────────────────────────────────────
+   Most pages use fixed Tailwind slate/white/tint classes rather than theme
+   variables. These overrides remap the common ones when <html> has .dark, so
+   the whole app reads well in dark mode without editing every component.
+   Add a line here when a new fixed colour looks wrong in dark mode.
+────────────────────────────────────────────────────────────────────────── */
+.dark {
+  color-scheme: dark;
+}
+.dark .bg-white { background-color: oklch(0.205 0 0); }
+.dark .bg-slate-50 { background-color: oklch(0.145 0 0); }
+.dark .bg-slate-100 { background-color: oklch(0.205 0 0); }
+.dark .bg-slate-200 { background-color: oklch(0.269 0 0); }
+.dark .hover\:bg-slate-50:hover { background-color: oklch(0.205 0 0); }
+.dark .hover\:bg-slate-100:hover { background-color: oklch(0.269 0 0); }
+.dark .text-slate-900 { color: oklch(0.985 0 0); }
+.dark .text-slate-800 { color: oklch(0.95 0 0); }
+.dark .text-slate-700 { color: oklch(0.9 0 0); }
+.dark .text-slate-600 { color: oklch(0.8 0 0); }
+.dark .text-slate-500 { color: oklch(0.708 0 0); }
+.dark .text-slate-400 { color: oklch(0.6 0 0); }
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-300 { border-color: oklch(1 0 0 / 14%); }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: oklch(1 0 0 / 10%); }
+.dark .bg-red-50 { background-color: oklch(0.3 0.08 25); }
+.dark .bg-red-100 { background-color: oklch(0.32 0.09 25); }
+.dark .bg-amber-50 { background-color: oklch(0.32 0.07 75); }
+.dark .bg-amber-100 { background-color: oklch(0.34 0.08 75); }
+.dark .bg-emerald-50 { background-color: oklch(0.3 0.06 160); }
+.dark .bg-green-50 { background-color: oklch(0.3 0.06 150); }
+.dark .bg-blue-50 { background-color: oklch(0.3 0.06 255); }
+.dark .bg-blue-100 { background-color: oklch(0.32 0.07 255); }
+.dark .bg-orange-100 { background-color: oklch(0.34 0.08 50); }
+.dark .bg-violet-100 { background-color: oklch(0.32 0.08 295); }
+.dark .text-red-600, .dark .text-red-700 { color: oklch(0.8 0.14 25); }
+.dark .text-emerald-600, .dark .text-emerald-700 { color: oklch(0.8 0.14 160); }
+.dark .text-green-600 { color: oklch(0.8 0.14 150); }
+.dark .text-amber-600, .dark .text-amber-700 { color: oklch(0.85 0.13 80); }
+.dark .text-blue-600, .dark .text-blue-700 { color: oklch(0.8 0.12 255); }
+.dark .text-orange-700 { color: oklch(0.82 0.13 55); }
+.dark .text-violet-600 { color: oklch(0.8 0.12 295); }
+
+/* ─── Phone layout for wide tables ──────────────────────────────────────────
+   On screens narrower than md, a table with class "table-stack" becomes a stack of
+   cards: one card per row, each cell labelled from its data-label attribute.
+   Wider screens keep the normal table. Add data-label to each <td> you want labelled.
+────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .table-stack thead { display: none; }
+  .table-stack,
+  .table-stack tbody,
+  .table-stack tr,
+  .table-stack td { display: block; width: 100%; }
+  .table-stack tbody tr {
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.25rem;
+    margin-bottom: 0.75rem;
+    background: var(--card);
+  }
+  .table-stack td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    text-align: right;
+    border: 0;
+    padding: 0.375rem 0.75rem;
+  }
+  .table-stack td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--muted-foreground);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .table-stack td:not([data-label])::before { content: none; }
+}

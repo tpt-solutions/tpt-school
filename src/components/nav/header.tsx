@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import SidebarNav from './sidebar'
+import InstallButton from '@/components/pwa/install-button'
+import ThemeToggle from '@/components/theme/theme-toggle'
 import { signOutAction } from '@/app/(dashboard)/actions'
 
 type HeaderProps = {
@@ -73,6 +75,9 @@ export default function DashboardHeader({ schoolName, user }: HeaderProps) {
         </div>
 
         <div className="flex-1" />
+
+        <InstallButton />
+        <ThemeToggle />
 
         {/* User menu */}
         <DropdownMenu>

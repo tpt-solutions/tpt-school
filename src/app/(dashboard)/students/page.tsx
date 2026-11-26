@@ -144,7 +144,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
 
       {/* Table */}
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-        <Table>
+        <Table className="table-stack">
           <TableHeader>
             <TableRow className="bg-slate-50">
               <TableHead className="font-semibold text-slate-700">Student ID</TableHead>
@@ -170,24 +170,24 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
                 }
                 return (
                   <TableRow key={student.id} className="hover:bg-slate-50/50">
-                    <TableCell className="font-mono text-sm text-slate-600">
+                    <TableCell data-label="Student ID" className="font-mono text-sm text-slate-600">
                       {student.studentId}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Name">
                       <div className="font-medium text-slate-900">{student.user.name}</div>
                       <div className="text-xs text-slate-400">{student.user.email}</div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Year level">
                       {student.yearLevel ? (
                         <span className="text-slate-700">Year {student.yearLevel}</span>
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Status">
                       <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
                     </TableCell>
-                    <TableCell className="text-slate-600 text-sm">
+                    <TableCell data-label="Enrolment date" className="text-slate-600 text-sm">
                       {new Date(student.enrollmentDate).toLocaleDateString('en-NZ', {
                         day: 'numeric',
                         month: 'short',
