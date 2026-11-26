@@ -19,9 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { UserPlus, Upload, Search } from 'lucide-react'
+import { UserPlus, Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
-type SearchParams = Promise<{ q?: string; yearLevel?: string; status?: string }>
+const PAGE_SIZE = 50
+
+type SearchParams = Promise<{ q?: string; yearLevel?: string; status?: string; page?: string }>
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   active: { label: 'Active', variant: 'default' },
@@ -33,26 +35,46 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
 export default async function StudentsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireRole(['admin', 'teacher'])
 
-  const { q = '', yearLevel = '', status = '' } = await searchParams
+  const { q = '', yearLevel = '', status = '', page: pageParam = '1' } = await searchParams
 
+  const where = {
+    AND: [
+      q
+        ? {
+            OR: [
+              { user: { name: { contains: q } } },
+              { studentId: { contains: q } },
+            ],
+          }
+        : {},
+      yearLevel ? { yearLevel: parseInt(yearLevel, 10) } : {},
+      status ? { enrollmentStatus: status } : {},
+    ],
+  }
+
+  const total = await db.student.count({ where })
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const requestedPage = parseInt(pageParam, 10)
+  const page = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), pageCount) : 1
+
+  // Select only the user fields the table shows; never load passwordHash here
   const students = await db.student.findMany({
-    where: {
-      AND: [
-        q
-          ? {
-              OR: [
-                { user: { name: { contains: q } } },
-                { studentId: { contains: q } },
-              ],
-            }
-          : {},
-        yearLevel ? { yearLevel: parseInt(yearLevel, 10) } : {},
-        status ? { enrollmentStatus: status } : {},
-      ],
-    },
-    include: { user: true },
-    orderBy: [{ enrollmentDate: 'desc' }],
+    where,
+    include: { user: { select: { name: true, email: true } } },
+    orderBy: [{ enrollmentDate: 'desc' }, { id: 'asc' }],
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
   })
+
+  const pageHref = (target: number) => {
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    if (yearLevel) params.set('yearLevel', yearLevel)
+    if (status) params.set('status', status)
+    if (target > 1) params.set('page', String(target))
+    const qs = params.toString()
+    return qs ? `/students?${qs}` : '/students'
+  }
 
   return (
     <div className="space-y-6">
@@ -61,7 +83,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Students</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {students.length} student{students.length !== 1 ? 's' : ''} found
+            {total} student{total !== 1 ? 's' : ''} found
           </p>
         </div>
         <div className="flex gap-2">
@@ -185,6 +207,28 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
           </TableBody>
         </Table>
       </div>
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between text-sm text-slate-600">
+          <span>Page {page} of {pageCount}</span>
+          <div className="flex gap-2">
+            <Link
+              href={pageHref(page - 1)}
+              aria-disabled={page <= 1}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page <= 1 ? ' pointer-events-none opacity-50' : '')}
+            >
+              <ChevronLeft className="w-4 h-4" /> Previous
+            </Link>
+            <Link
+              href={pageHref(page + 1)}
+              aria-disabled={page >= pageCount}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page >= pageCount ? ' pointer-events-none opacity-50' : '')}
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

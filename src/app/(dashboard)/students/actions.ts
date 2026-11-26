@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { hashPassword, requireRole } from '@/lib/auth'
 import { nextStudentId, withIdRetry } from '@/lib/ids'
 import { checkPersonFields } from '@/lib/validation'
+import { logAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -179,7 +180,7 @@ export async function updateStudentAction(id: string, formData: FormData): Promi
 // ─── Delete (soft) ───────────────────────────────────────────────────────────
 
 export async function deleteStudentAction(id: string): Promise<{ success: boolean; error?: string }> {
-  await requireRole(['admin'])
+  const actor = await requireRole(['admin'])
 
   try {
     const student = await db.student.findUnique({ where: { id } })
@@ -195,6 +196,7 @@ export async function deleteStudentAction(id: string): Promise<{ success: boolea
       data: { active: false },
     })
 
+    await logAudit(actor.id, 'DELETE', 'Student', 'Deactivated student account (soft delete)', id)
     revalidatePath('/students')
     return { success: true }
   } catch (err: unknown) {
