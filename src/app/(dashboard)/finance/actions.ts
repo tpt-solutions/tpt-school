@@ -136,11 +136,6 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
     if (itemDescriptions.some(d => !d.trim() || d.trim().length > 200)) {
       return { success: false, error: 'Each line item needs a description of 200 characters or fewer.' }
     }
-    if (notes && notes.length > 2000) return { success: false, error: 'Notes must be 2000 characters or fewer.' }
-    if (itemDescriptions.length > 100) return { success: false, error: 'An invoice can have at most 100 line items.' }
-    if (itemDescriptions.some(d => !d.trim() || d.trim().length > 200)) {
-      return { success: false, error: 'Each line item needs a description of 200 characters or fewer.' }
-    }
     const dueParsed = parseWith(field.date('Due date'), dueDateRaw)
     if (!dueParsed.ok) return { success: false, error: dueParsed.error }
     const dueDate = dueParsed.data
