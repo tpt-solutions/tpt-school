@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendEmail, invoiceEmailHtml } from '@/lib/email'
@@ -182,21 +183,34 @@ export async function recordPaymentAction(
   try {
     const user = await requireRole(['admin'])
 
-    const invoice = await db.feeInvoice.findUnique({ where: { id: invoiceId } })
-    if (!invoice) return { success: false, error: 'Invoice not found.' }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { success: false, error: 'Payment amount must be greater than zero.' }
+    }
 
-    if (amount <= 0) return { success: false, error: 'Payment amount must be greater than zero.' }
+    // Atomic increment inside a transaction: concurrent payments cannot overwrite each other's totals
+    const outcome = await db.$transaction(async (tx) => {
+      const invoice = await tx.feeInvoice.findUnique({ where: { id: invoiceId } })
+      if (!invoice) return { error: 'Invoice not found.' as const }
 
-    const newPaidAmount = (invoice.paidAmount ?? 0) + amount
-    const newStatus =
-      newPaidAmount >= invoice.totalAmount
-        ? 'paid'
-        : newPaidAmount > 0
-        ? 'partial'
-        : invoice.status
+      const outstanding = invoice.totalAmount - (invoice.paidAmount ?? 0)
+      if (amount > outstanding + 1e-9) {
+        return { error: 'Payment exceeds the outstanding balance.' as const }
+      }
 
-    await db.$transaction([
-      db.feePayment.create({
+      const updated = await tx.feeInvoice.update({
+        where: { id: invoiceId },
+        data: { paidAmount: { increment: amount } },
+        select: { paidAmount: true, totalAmount: true, status: true },
+      })
+      const newStatus =
+        (updated.paidAmount ?? 0) >= updated.totalAmount
+          ? 'paid'
+          : (updated.paidAmount ?? 0) > 0
+          ? 'partial'
+          : updated.status
+      await tx.feeInvoice.update({ where: { id: invoiceId }, data: { status: newStatus } })
+
+      await tx.feePayment.create({
         data: {
           invoiceId,
           amount,
@@ -206,12 +220,13 @@ export async function recordPaymentAction(
           paidAt: new Date(),
           recordedBy: user.id,
         },
-      }),
-      db.feeInvoice.update({
-        where: { id: invoiceId },
-        data: { paidAmount: newPaidAmount, status: newStatus },
-      }),
-    ])
+      })
+      return { ok: true as const }
+    })
+
+    if ('error' in outcome) return { success: false, error: outcome.error }
+
+    await logAudit(user.id, 'CREATE', 'FeePayment', `Recorded ${amount} (${method}) against invoice ${invoiceId}`, invoiceId)
 
     revalidatePath('/finance')
     revalidatePath(`/finance/invoices/${invoiceId}`)

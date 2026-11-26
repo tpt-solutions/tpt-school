@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt, isEncrypted } from '@/lib/crypto'
 
@@ -82,7 +83,8 @@ export async function updateSchoolSettingsAction(
   formData: FormData,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await requireRole(['admin'])
+    const actor = await requireRole(['admin'])
+    await logAudit(actor.id, 'UPDATE', 'SchoolSettings', 'Updated school settings')
 
     const data = {
       name: (formData.get('name') as string)?.trim() || '',
