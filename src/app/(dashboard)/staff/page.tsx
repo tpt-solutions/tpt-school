@@ -12,9 +12,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import { UserPlus, Upload, Search } from 'lucide-react'
+import { UserPlus, Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
-type SearchParams = Promise<{ q?: string }>
+type SearchParams = Promise<{ q?: string; page?: string }>
+
+const PAGE_SIZE = 50
 
 const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
   'full-time': 'Full-time',
@@ -25,20 +27,37 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
 export default async function StaffPage({ searchParams }: { searchParams: SearchParams }) {
   await requireRole(['admin'])
 
-  const { q = '' } = await searchParams
+  const { q = '', page: pageParam = '1' } = await searchParams
+
+  const where = q
+    ? {
+        OR: [
+          { user: { name: { contains: q } } },
+          { employeeId: { contains: q } },
+        ],
+      }
+    : {}
+
+  const total = await db.staff.count({ where })
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const requestedPage = parseInt(pageParam, 10)
+  const page = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), pageCount) : 1
 
   const staffList = await db.staff.findMany({
-    where: q
-      ? {
-          OR: [
-            { user: { name: { contains: q } } },
-            { employeeId: { contains: q } },
-          ],
-        }
-      : {},
+    where,
     include: { user: true },
-    orderBy: { user: { name: 'asc' } },
+    orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
   })
+
+  const pageHref = (target: number) => {
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    if (target > 1) params.set('page', String(target))
+    const qs = params.toString()
+    return qs ? `/staff?${qs}` : '/staff'
+  }
 
   return (
     <div className="space-y-6">
@@ -47,7 +66,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Staff</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {staffList.length} staff member{staffList.length !== 1 ? 's' : ''} found
+            {total} staff member{total !== 1 ? 's' : ''} found
           </p>
         </div>
         <div className="flex gap-2">
@@ -80,7 +99,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
 
       {/* Table */}
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-        <Table>
+        <Table className="table-stack">
+          <caption className="sr-only">Staff members</caption>
           <TableHeader>
             <TableRow className="bg-slate-50">
               <TableHead className="font-semibold text-slate-700">Employee ID</TableHead>
@@ -96,7 +116,10 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
             {staffList.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-slate-400">
-                  No staff members found. Try adjusting your search or add a new staff member.
+                  <p>No staff members found. Try adjusting your search or add a new staff member.</p>
+                  <Link href="/staff/new" className={buttonVariants({ size: 'sm' }) + ' mt-3'}>
+                    Add a staff member
+                  </Link>
                 </TableCell>
               </TableRow>
             ) : (
@@ -104,23 +127,23 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
                 const isActive = !staff.dateLeft
                 return (
                   <TableRow key={staff.id} className="hover:bg-slate-50/50">
-                    <TableCell className="font-mono text-sm text-slate-600">
+                    <TableCell data-label="Employee ID" className="font-mono text-sm text-slate-600">
                       {staff.employeeId}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Name">
                       <div className="font-medium text-slate-900">{staff.user.name}</div>
                       <div className="text-xs text-slate-400">{staff.user.email}</div>
                     </TableCell>
-                    <TableCell className="text-slate-700">
+                    <TableCell data-label="Job title" className="text-slate-700">
                       {staff.jobTitle ?? <span className="text-slate-400">—</span>}
                     </TableCell>
-                    <TableCell className="text-slate-700">
+                    <TableCell data-label="Department" className="text-slate-700">
                       {staff.department ?? <span className="text-slate-400">—</span>}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Employment type">
                       {EMPLOYMENT_TYPE_LABELS[staff.employmentType] ?? staff.employmentType}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Status">
                       <Badge variant={isActive ? 'default' : 'secondary'}>
                         {isActive ? 'Active' : 'Left'}
                       </Badge>
@@ -138,6 +161,28 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
           </TableBody>
         </Table>
       </div>
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between text-sm text-slate-600">
+          <span>Page {page} of {pageCount}</span>
+          <div className="flex gap-2">
+            <Link
+              href={pageHref(page - 1)}
+              aria-disabled={page <= 1}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page <= 1 ? ' pointer-events-none opacity-50' : '')}
+            >
+              <ChevronLeft className="w-4 h-4" /> Previous
+            </Link>
+            <Link
+              href={pageHref(page + 1)}
+              aria-disabled={page >= pageCount}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page >= pageCount ? ' pointer-events-none opacity-50' : '')}
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

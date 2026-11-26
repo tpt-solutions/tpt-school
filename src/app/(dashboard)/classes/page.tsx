@@ -11,23 +11,34 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, BookOpen, Eye } from 'lucide-react'
+import { Plus, BookOpen, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+
+const PAGE_SIZE = 50
 
 interface PageProps {
-  searchParams: Promise<{ yearLevel?: string }>
+  searchParams: Promise<{ yearLevel?: string; page?: string }>
 }
 
 export default async function ClassesPage({ searchParams }: PageProps) {
   const user = await requireRole(['admin', 'teacher'])
-  const { yearLevel } = await searchParams
+  const { yearLevel, page: pageParam = '1' } = await searchParams
 
   const activeYear = await db.academicYear.findFirst({ where: { active: true } })
 
+  const where = {
+    academicYearId: activeYear?.id,
+    ...(yearLevel ? { yearLevel: Number(yearLevel) } : {}),
+  }
+
+  const total = await db.class.count({ where })
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const requestedPage = parseInt(pageParam, 10)
+  const page = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), pageCount) : 1
+
   const classes = await db.class.findMany({
-    where: {
-      academicYearId: activeYear?.id,
-      ...(yearLevel ? { yearLevel: Number(yearLevel) } : {}),
-    },
+    where,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     include: {
       room: true,
       teachers: {
@@ -36,8 +47,16 @@ export default async function ClassesPage({ searchParams }: PageProps) {
       },
       _count: { select: { enrolments: { where: { status: 'active' } } } },
     },
-    orderBy: [{ yearLevel: 'asc' }, { name: 'asc' }],
+    orderBy: [{ yearLevel: 'asc' }, { name: 'asc' }, { id: 'asc' }],
   })
+
+  const pageHref = (target: number) => {
+    const params = new URLSearchParams()
+    if (yearLevel) params.set('yearLevel', yearLevel)
+    if (target > 1) params.set('page', String(target))
+    const qs = params.toString()
+    return qs ? `/classes?${qs}` : '/classes'
+  }
 
   const yearLevels = Array.from({ length: 13 }, (_, i) => i + 1)
 
@@ -84,7 +103,8 @@ export default async function ClassesPage({ searchParams }: PageProps) {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <Table>
+        <Table className="table-stack">
+          <caption className="sr-only">Classes</caption>
           <TableHeader>
             <TableRow className="bg-slate-50">
               <TableHead>Code</TableHead>
@@ -113,21 +133,21 @@ export default async function ClassesPage({ searchParams }: PageProps) {
                 const primaryTeacher = cls.teachers[0]?.staff.user.name ?? '—'
                 return (
                   <TableRow key={cls.id} className="hover:bg-slate-50">
-                    <TableCell className="font-mono font-medium text-slate-700">{cls.code}</TableCell>
-                    <TableCell className="font-medium">{cls.name}</TableCell>
-                    <TableCell className="text-slate-600">{cls.subject ?? '—'}</TableCell>
-                    <TableCell>
+                    <TableCell data-label="Code" className="font-mono font-medium text-slate-700">{cls.code}</TableCell>
+                    <TableCell data-label="Name" className="font-medium">{cls.name}</TableCell>
+                    <TableCell data-label="Subject" className="text-slate-600">{cls.subject ?? '—'}</TableCell>
+                    <TableCell data-label="Year level">
                       {cls.yearLevel ? (
                         <Badge variant="secondary">Year {cls.yearLevel}</Badge>
                       ) : '—'}
                     </TableCell>
-                    <TableCell className="text-slate-600">{primaryTeacher}</TableCell>
-                    <TableCell className="text-slate-600">
+                    <TableCell data-label="Teacher" className="text-slate-600">{primaryTeacher}</TableCell>
+                    <TableCell data-label="Room" className="text-slate-600">
                       {cls.room ? (
                         <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">{cls.room.code}</span>
                       ) : '—'}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell data-label="Students" className="text-center">
                       <span className="text-slate-700 font-medium">{cls._count.enrolments}</span>
                       {cls.maxStudents ? (
                         <span className="text-slate-400 text-xs"> / {cls.maxStudents}</span>
@@ -146,6 +166,28 @@ export default async function ClassesPage({ searchParams }: PageProps) {
           </TableBody>
         </Table>
       </div>
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between text-sm text-slate-600">
+          <span>Page {page} of {pageCount}</span>
+          <div className="flex gap-2">
+            <Link
+              href={pageHref(page - 1)}
+              aria-disabled={page <= 1}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page <= 1 ? ' pointer-events-none opacity-50' : '')}
+            >
+              <ChevronLeft className="w-4 h-4" /> Previous
+            </Link>
+            <Link
+              href={pageHref(page + 1)}
+              aria-disabled={page >= pageCount}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page >= pageCount ? ' pointer-events-none opacity-50' : '')}
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
