@@ -1,7 +1,7 @@
 import { requireRole } from '@/lib/auth'
 import { db } from '@/lib/db'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, DollarSign, AlertCircle, CheckCircle, Clock } from 'lucide-react'
@@ -29,13 +29,25 @@ function formatCurrency(cents: number, symbol: string) {
   return formatCents(cents, symbol)
 }
 
-export default async function FinancePage() {
+const INVOICE_PAGE_SIZE = 50
+
+export default async function FinancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
   await requireRole(['admin'])
+  const { page: pageParam = '1' } = await searchParams
 
   const settings = await db.schoolSettings.findFirst()
   const currencySymbol = settings?.currencySymbol ?? '$'
 
   // Overview stats
+  const invoiceTotal = await db.feeInvoice.count()
+  const invoicePageCount = Math.max(1, Math.ceil(invoiceTotal / INVOICE_PAGE_SIZE))
+  const requestedPage = parseInt(pageParam, 10)
+  const invoicePage = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), invoicePageCount) : 1
+
   const [unpaidInvoices, overdueInvoices, allInvoices] = await Promise.all([
     db.feeInvoice.findMany({ where: { status: { in: ['unpaid', 'partial'] } }, select: { totalAmountCents: true, paidAmountCents: true } }),
     db.feeInvoice.count({ where: { status: 'overdue' } }),
@@ -44,6 +56,8 @@ export default async function FinancePage() {
         student: { include: { user: { select: { name: true } } } },
       },
       orderBy: { createdAt: 'desc' },
+      skip: (invoicePage - 1) * INVOICE_PAGE_SIZE,
+      take: INVOICE_PAGE_SIZE,
     }),
   ])
 
@@ -137,10 +151,13 @@ export default async function FinancePage() {
             <div className="text-center py-16 text-slate-400">
               <DollarSign className="w-10 h-10 mx-auto mb-3 opacity-40" />
               <p>No invoices yet.</p>
+              <Link href="/finance/invoices/new" className={buttonVariants({ size: 'sm' }) + ' mt-4'}>
+                <Plus className="w-4 h-4 mr-1" /> Create the first invoice
+              </Link>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-slate-100">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-stack">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Student</th>
@@ -155,22 +172,22 @@ export default async function FinancePage() {
                 <tbody className="divide-y divide-slate-50">
                   {allInvoices.map(inv => (
                     <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-slate-900">
+                      <td data-label="Student" className="px-4 py-3 font-medium text-slate-900">
                         {inv.student.user.name}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">
+                      <td data-label="Issued" className="px-4 py-3 text-slate-600">
                         {format(new Date(inv.issueDate), 'dd MMM yyyy')}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">
+                      <td data-label="Due" className="px-4 py-3 text-slate-600">
                         {format(new Date(inv.dueDate), 'dd MMM yyyy')}
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-900">
+                      <td data-label="Total" className="px-4 py-3 text-right text-slate-900">
                         {formatCurrency(inv.totalAmountCents, currencySymbol)}
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-600">
+                      <td data-label="Paid" className="px-4 py-3 text-right text-slate-600">
                         {formatCurrency(inv.paidAmountCents, currencySymbol)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td data-label="Status" className="px-4 py-3">
                         <StatusBadge status={inv.status} />
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -187,6 +204,27 @@ export default async function FinancePage() {
               </table>
             </div>
           )}
+          {invoicePageCount > 1 && (
+            <nav aria-label="Invoice pages" className="mt-4 flex items-center justify-between text-sm text-slate-600">
+              <span>Page {invoicePage} of {invoicePageCount} ({invoiceTotal} invoices)</span>
+              <div className="flex gap-2">
+                <Link
+                  href={invoicePage > 1 ? `/finance?page=${invoicePage - 1}` : '/finance'}
+                  aria-disabled={invoicePage <= 1}
+                  className={buttonVariants({ variant: 'outline', size: 'sm' }) + (invoicePage <= 1 ? ' pointer-events-none opacity-50' : '')}
+                >
+                  Previous
+                </Link>
+                <Link
+                  href={`/finance?page=${invoicePage + 1}`}
+                  aria-disabled={invoicePage >= invoicePageCount}
+                  className={buttonVariants({ variant: 'outline', size: 'sm' }) + (invoicePage >= invoicePageCount ? ' pointer-events-none opacity-50' : '')}
+                >
+                  Next
+                </Link>
+              </div>
+            </nav>
+          )}
         </TabsContent>
 
         {/* Fee Types Tab */}
@@ -195,6 +233,11 @@ export default async function FinancePage() {
             <Link href="/finance/fee-types">
               <Button variant="outline" size="sm">
                 Manage Fee Types
+              </Button>
+            </Link>
+            <Link href="/finance/recurring">
+              <Button variant="outline" size="sm">
+                Term fees
               </Button>
             </Link>
           </div>

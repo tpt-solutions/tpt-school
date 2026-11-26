@@ -3,7 +3,6 @@ import { db } from '@/lib/db'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import FeeTypeForm from './fee-type-form'
-import { Card, CardContent } from '@/components/ui/card'
 import { formatCents } from '@/lib/money'
 
 function formatCurrency(cents: number, symbol: string) {
@@ -30,6 +29,12 @@ export default async function FeeTypesPage() {
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">Fee Types</h1>
         <p className="text-sm text-slate-500 mt-0.5">Define the types of fees charged to students.</p>
+        <Link
+          href="/finance/fee-types/import"
+          className="inline-flex items-center text-sm font-medium text-primary hover:underline mt-2"
+        >
+          Import fee types from CSV →
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
