@@ -22,6 +22,18 @@ const TEMPLATES = [
     required: ['firstName', 'lastName', 'email'],
   },
   {
+    file: 'timetable-template.csv',
+    title: 'Timetable import',
+    description: 'Adds timetable periods for the active year. Import from Timetable → Import.',
+    required: ['classCode', 'day', 'period', 'startTime', 'endTime'],
+  },
+  {
+    file: 'guardians-template.csv',
+    title: 'Guardian import',
+    description: 'Links guardians to existing students. Import from Students → Import guardians.',
+    required: ['studentId', 'email', 'firstName', 'lastName'],
+  },
+  {
     file: 'classes-template.csv',
     title: 'Class import',
     description: 'Creates classes in the active academic year. Import from Classes → Import.',
