@@ -15,8 +15,11 @@ type SchoolInfo = {
   phone: string
   email: string
   schoolType: string
+  country?: string
   currentYear: string
 }
+
+const COUNTRY_CODES = ['nz', 'au', 'uk', 'ca', 'other'] as const
 
 type TermInput = {
   name: string
@@ -99,6 +102,10 @@ export async function completeSetupAction(
     if (adminInfo.password !== adminInfo.confirmPassword)
       return { success: false, error: 'Passwords do not match.' }
 
+    if (schoolInfo.country && !(COUNTRY_CODES as readonly string[]).includes(schoolInfo.country)) {
+      return { success: false, error: 'Choose a school year system from the list.' }
+    }
+
     const yearResult = validateAcademicYear(academicYear, year)
     if (!yearResult.ok) return { success: false, error: yearResult.error }
     const yearData = yearResult.data
@@ -124,6 +131,7 @@ export async function completeSetupAction(
         email: schoolInfo.email?.trim().toLowerCase() || null,
         schoolType: schoolInfo.schoolType,
         currentYear: year,
+        country: schoolInfo.country || null,
         setupComplete: true,
       }
 

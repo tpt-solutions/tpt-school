@@ -15,6 +15,7 @@ type SchoolInfo = {
   phone: string
   email: string
   schoolType: string
+  country: string
   currentYear: string
 }
 
@@ -60,6 +61,63 @@ function defaultAcademicYear(year: number): AcademicYearDraft {
   }
 }
 
+/**
+ * Typical term structures by country. These are starting points only: term names and dates
+ * vary by state, district and year, so the admin checks them on the next step.
+ */
+const COUNTRY_PRESETS: Record<string, { label: string; build: (year: number) => AcademicYearDraft }> = {
+  other: { label: 'Other (two terms, Feb to Dec)', build: defaultAcademicYear },
+  nz: {
+    label: 'New Zealand (four terms)',
+    build: (y) => ({
+      startDate: `${y}-02-01`,
+      endDate: `${y}-12-15`,
+      terms: [
+        { name: 'Term 1', startDate: `${y}-02-01`, endDate: `${y}-04-10` },
+        { name: 'Term 2', startDate: `${y}-04-27`, endDate: `${y}-07-03` },
+        { name: 'Term 3', startDate: `${y}-07-20`, endDate: `${y}-09-25` },
+        { name: 'Term 4', startDate: `${y}-10-12`, endDate: `${y}-12-15` },
+      ],
+    }),
+  },
+  au: {
+    label: 'Australia (four terms)',
+    build: (y) => ({
+      startDate: `${y}-02-01`,
+      endDate: `${y}-12-15`,
+      terms: [
+        { name: 'Term 1', startDate: `${y}-02-01`, endDate: `${y}-04-01` },
+        { name: 'Term 2', startDate: `${y}-04-15`, endDate: `${y}-06-30` },
+        { name: 'Term 3', startDate: `${y}-07-15`, endDate: `${y}-09-22` },
+        { name: 'Term 4', startDate: `${y}-10-08`, endDate: `${y}-12-15` },
+      ],
+    }),
+  },
+  uk: {
+    label: 'United Kingdom (three terms, Sep to Jul)',
+    build: (y) => ({
+      startDate: `${y}-09-01`,
+      endDate: `${y + 1}-07-25`,
+      terms: [
+        { name: 'Autumn', startDate: `${y}-09-01`, endDate: `${y}-12-20` },
+        { name: 'Spring', startDate: `${y + 1}-01-05`, endDate: `${y + 1}-03-31` },
+        { name: 'Summer', startDate: `${y + 1}-04-15`, endDate: `${y + 1}-07-25` },
+      ],
+    }),
+  },
+  ca: {
+    label: 'Canada (two semesters, Sep to Jun)',
+    build: (y) => ({
+      startDate: `${y}-09-01`,
+      endDate: `${y + 1}-06-30`,
+      terms: [
+        { name: 'Semester 1', startDate: `${y}-09-01`, endDate: `${y + 1}-01-31` },
+        { name: 'Semester 2', startDate: `${y + 1}-02-01`, endDate: `${y + 1}-06-30` },
+      ],
+    }),
+  },
+}
+
 export default function SetupWizard() {
   const [step, setStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +131,7 @@ export default function SetupWizard() {
     phone: '',
     email: '',
     schoolType: 'both',
+    country: 'other',
     currentYear: new Date().getFullYear().toString(),
   })
 
@@ -290,6 +349,28 @@ export default function SetupWizard() {
                       <SelectItem value="both">Primary &amp; Secondary</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="school-country">School year system</Label>
+                  <Select
+                    value={schoolInfo.country}
+                    onValueChange={v => {
+                      if (v == null || !COUNTRY_PRESETS[v]) return
+                      updateSchool('country', v)
+                      // Replace the term plan with this country's typical layout; the next step lets the admin edit it
+                      setYearInfo(COUNTRY_PRESETS[v].build(Number(schoolInfo.currentYear) || new Date().getFullYear()))
+                    }}
+                  >
+                    <SelectTrigger id="school-country">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(COUNTRY_PRESETS).map(([key, preset]) => (
+                        <SelectItem key={key} value={key}>{preset.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500">Fills in typical term names and dates. Check them on the next step.</p>
                 </div>
                 <div className="sm:col-span-2 space-y-1.5">
                   <Label htmlFor="school-address">Address</Label>
