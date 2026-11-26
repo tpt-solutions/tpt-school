@@ -6,6 +6,8 @@ export type EmailPayload = {
   subject: string
   html: string
   text?: string
+  /** Stored in EmailLog instead of the body — use for emails containing secrets (reset links). */
+  logBody?: string
 }
 
 export async function sendEmail(
@@ -47,7 +49,7 @@ export async function sendEmail(
       data: {
         to: payload.to,
         subject: payload.subject,
-        body: payload.text ?? payload.html,
+        body: payload.logBody ?? payload.text ?? payload.html,
         status: result.success ? 'sent' : 'failed',
         sentAt: result.success ? new Date() : null,
         error: result.error ?? null,

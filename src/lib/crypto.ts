@@ -3,8 +3,14 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 const ALGORITHM = 'aes-256-gcm'
 const ENC_PREFIX = 'enc:'
 
+const DEV_FALLBACK_SECRET = 'insecure-dev-secret-replace-in-prod'
+
 function getDerivedKey(): Buffer {
-  const secret = process.env.AUTH_SECRET ?? 'insecure-dev-secret-replace-in-prod'
+  const configured = process.env.AUTH_SECRET
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SECRET must be set in production to encrypt/decrypt stored secrets')
+  }
+  const secret = configured || DEV_FALLBACK_SECRET
   // Derive a stable 32-byte key from the secret
   return scryptSync(secret, 'tpt-school-enc-salt', 32)
 }

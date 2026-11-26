@@ -12,11 +12,12 @@ export async function loginAction(
     return { success: false, error: 'Email and password are required.' }
   }
 
+  // Client IP headers are client-controlled unless a reverse proxy sets them.
+  // Only honour them when the operator explicitly says a proxy is in front.
   const headersList = await headers()
-  const ip =
-    headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    headersList.get('x-real-ip') ??
-    'unknown'
+  const ip = process.env.TRUST_PROXY === 'true'
+    ? headersList.get('x-forwarded-for')?.split(',')[0]?.trim() || headersList.get('x-real-ip') || null
+    : null
 
   const normalizedEmail = email.trim().toLowerCase()
 

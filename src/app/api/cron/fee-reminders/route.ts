@@ -1,17 +1,20 @@
+import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendEmail, feeReminderEmailHtml } from '@/lib/email'
 
-// Protected by CRON_SECRET header — set this env var and pass it as
-// "Authorization: Bearer <secret>" when calling from a scheduler.
-// Admin UI calls this directly without the header check (server action wrapper).
+// Protected by CRON_SECRET — pass it as "Authorization: Bearer <secret>" from a scheduler.
+// Fails closed: if CRON_SECRET is unset, every request is rejected.
+// The admin UI does not call this route; it uses runFeeReminders() directly (server action).
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
-  if (secret) {
-    const auth = req.headers.get('authorization')
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!secret) {
+    return NextResponse.json({ error: 'CRON_SECRET is not configured' }, { status: 401 })
+  }
+  const auth = req.headers.get('authorization') ?? ''
+  const expected = `Bearer ${secret}`
+  if (auth.length !== expected.length || !timingSafeEqual(Buffer.from(auth), Buffer.from(expected))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   return NextResponse.json(await sendFeeReminders())

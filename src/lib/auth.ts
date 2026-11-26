@@ -1,8 +1,9 @@
-"use server";
+import "server-only";
 
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { logAudit } from "@/lib/audit";
 
 const SESSION_COOKIE = "tpt_session";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -128,6 +129,7 @@ export async function signIn(
 
   const token = await createSession(user.id);
   await setSessionCookie(token);
+  await logAudit(user.id, "LOGIN", "User", "Signed in", user.id);
   db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
   return { success: true };
 }

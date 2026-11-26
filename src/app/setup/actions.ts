@@ -16,6 +16,8 @@ type SchoolInfo = {
   currentYear: string
 }
 
+class SetupError extends Error {}
+
 type AdminInfo = {
   name: string
   email: string
@@ -37,24 +39,19 @@ export async function completeSetupAction(
     if (adminInfo.password !== adminInfo.confirmPassword)
       return { success: false, error: 'Passwords do not match.' }
 
-    // Check if setup already done
-    const existing = await db.schoolSettings.findFirst()
-    if (existing?.setupComplete) {
-      return { success: false, error: 'Setup has already been completed.' }
-    }
-
-    // Check for duplicate admin email
-    const existingUser = await db.user.findUnique({
-      where: { email: adminInfo.email.trim().toLowerCase() },
-    })
-    if (existingUser) {
-      return { success: false, error: 'An account with this email already exists.' }
-    }
-
     const passwordHash = await hashPassword(adminInfo.password)
 
-    // Run in a transaction
+    // The "already set up" and duplicate checks must happen inside the same
+    // transaction as the writes, otherwise two concurrent submissions can both pass.
     await db.$transaction(async (tx: TransactionClient) => {
+      const existing = await tx.schoolSettings.findFirst()
+      if (existing?.setupComplete) throw new SetupError('Setup has already been completed.')
+
+      const existingUser = await tx.user.findUnique({
+        where: { email: adminInfo.email.trim().toLowerCase() },
+      })
+      if (existingUser) throw new SetupError('An account with this email already exists.')
+
       // Create or update SchoolSettings
       if (existing) {
         await tx.schoolSettings.update({
@@ -99,6 +96,7 @@ export async function completeSetupAction(
 
     return { success: true }
   } catch (err) {
+    if (err instanceof SetupError) return { success: false, error: err.message }
     console.error('Setup error:', err)
     return { success: false, error: 'An unexpected error occurred. Please try again.' }
   }
