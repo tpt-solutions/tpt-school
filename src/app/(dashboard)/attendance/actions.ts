@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { teachesClass } from '@/lib/access'
 import { checkTruancy } from '@/lib/truancy'
+import { notifyGuardiansOfAbsences } from '@/lib/absence-notify'
 
 const ATTENDANCE_STATUSES = ['present', 'absent', 'late', 'excused'] as const
 
@@ -84,6 +85,10 @@ export async function saveAttendanceAction(
     const absentStudents = records.filter(r => r.status === 'absent').map(r => r.studentId)
     if (absentStudents.length > 0) {
       await Promise.all(absentStudents.map(sid => checkTruancy(sid, term.id)))
+      // Never throws, so a mail problem cannot make the roll save look like it failed.
+      await notifyGuardiansOfAbsences(absentStudents, today).catch(err =>
+        console.error('Absence notifications failed:', err),
+      )
     }
 
     revalidatePath(`/attendance/roll/${classId}`)

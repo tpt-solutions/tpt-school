@@ -1,19 +1,24 @@
 import 'server-only'
 import { db } from '@/lib/db'
 import { sendEmail, feeReminderEmailHtml } from '@/lib/email'
+import { escalateOverdueInvoices } from '@/lib/overdue'
 
 export type FeeReminderResult = { sent: number; skipped: number; errors: number }
 
 // Sends payment reminders for overdue invoices (at most one every 7 days per invoice).
 // Shared by the CRON route, the admin "send reminders" action, and the in-process scheduler.
+// It also runs overdue escalation first, so invoices past due are marked "overdue" and admins are told.
 export async function sendFeeReminders(): Promise<FeeReminderResult> {
+  await escalateOverdueInvoices().catch(err => console.error('Overdue escalation failed:', err))
+
   const settings = await db.schoolSettings.findFirst()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const now = new Date()
 
   const overdueInvoices = await db.feeInvoice.findMany({
     where: {
-      status: { in: ['unpaid', 'partial'] },
+      // Include "overdue": reminders must keep going after escalation.
+      status: { in: ['unpaid', 'partial', 'overdue'] },
       dueDate: { lt: now },
       OR: [
         { lastReminderSentAt: null },
