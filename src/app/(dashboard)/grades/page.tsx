@@ -65,7 +65,8 @@ export default async function GradesPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <Table>
+        <Table className="table-stack">
+          <caption className="sr-only">Gradebooks</caption>
           <TableHeader>
             <TableRow className="bg-slate-50">
               <TableHead>Assessment</TableHead>
@@ -84,28 +85,31 @@ export default async function GradesPage() {
                 <TableCell colSpan={8} className="text-center py-12 text-slate-400">
                   <Award className="w-8 h-8 mx-auto mb-2 opacity-40" />
                   <p>No assessments found</p>
+                  <Link href="/grades/new" className={buttonVariants({ size: 'sm' }) + ' mt-3'}>
+                    Create the first assessment
+                  </Link>
                 </TableCell>
               </TableRow>
             ) : (
               gradebooks.map((gb) => (
                 <TableRow key={gb.id} className="hover:bg-slate-50">
-                  <TableCell className="font-medium">{gb.name}</TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell data-label="Assessment" className="font-medium">{gb.name}</TableCell>
+                  <TableCell data-label="Class" className="text-slate-600">
                     <Link href={`/classes/${gb.classId}`} className="hover:text-primary">
                       {gb.class.name}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-slate-600">{gb.term.name}</TableCell>
-                  <TableCell>
+                  <TableCell data-label="Term" className="text-slate-600">{gb.term.name}</TableCell>
+                  <TableCell data-label="Type">
                     <Badge className={(TYPE_COLORS[gb.type] ?? 'bg-slate-100 text-slate-700') + ' border-0 capitalize'}>
                       {gb.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell data-label="Due date" className="text-slate-600">
                     {gb.dueDate ? format(new Date(gb.dueDate), 'dd MMM yyyy') : '—'}
                   </TableCell>
-                  <TableCell className="text-center font-medium">{gb.maxScore}</TableCell>
-                  <TableCell className="text-center text-slate-600">{gb._count.grades}</TableCell>
+                  <TableCell data-label="Max score" className="text-center font-medium">{gb.maxScore}</TableCell>
+                  <TableCell data-label="Grades" className="text-center text-slate-600">{gb._count.grades}</TableCell>
                   <TableCell className="text-right">
                     <Link href={`/grades/${gb.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>Enter Grades</Link>
                   </TableCell>

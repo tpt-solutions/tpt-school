@@ -413,7 +413,8 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
             </div>
           ) : (
             <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-              <Table>
+              <Table className="table-stack">
+                <caption className="sr-only">Uploaded documents</caption>
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead>Document Name</TableHead>
@@ -424,9 +425,9 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
                 <TableBody>
                   {student.documents.map((doc) => (
                     <TableRow key={doc.id}>
-                      <TableCell className="font-medium text-slate-900">{doc.name}</TableCell>
-                      <TableCell className="text-slate-600">{doc.type}</TableCell>
-                      <TableCell className="text-slate-500 text-sm">
+                      <TableCell data-label="Document name" className="font-medium text-slate-900">{doc.name}</TableCell>
+                      <TableCell data-label="Type" className="text-slate-600">{doc.type}</TableCell>
+                      <TableCell data-label="Uploaded" className="text-slate-500 text-sm">
                         {new Date(doc.uploadedAt).toLocaleDateString('en-NZ')}
                       </TableCell>
                     </TableRow>
@@ -445,7 +446,8 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
             </div>
           ) : (
             <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-              <Table>
+              <Table className="table-stack">
+                <caption className="sr-only">Class enrolments</caption>
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead>Class</TableHead>
@@ -458,15 +460,15 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
                 <TableBody>
                   {student.classEnrolments.map((enrolment) => (
                     <TableRow key={enrolment.id}>
-                      <TableCell className="font-medium text-slate-900">{enrolment.class.name}</TableCell>
-                      <TableCell className="font-mono text-sm text-slate-600">{enrolment.class.code}</TableCell>
-                      <TableCell className="text-slate-600">{enrolment.class.subject ?? '—'}</TableCell>
-                      <TableCell>
+                      <TableCell data-label="Class" className="font-medium text-slate-900">{enrolment.class.name}</TableCell>
+                      <TableCell data-label="Code" className="font-mono text-sm text-slate-600">{enrolment.class.code}</TableCell>
+                      <TableCell data-label="Subject" className="text-slate-600">{enrolment.class.subject ?? '—'}</TableCell>
+                      <TableCell data-label="Status">
                         <Badge variant={enrolment.status === 'active' ? 'default' : 'secondary'}>
                           {enrolment.status.charAt(0).toUpperCase() + enrolment.status.slice(1)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-slate-500 text-sm">
+                      <TableCell data-label="Enrolled" className="text-slate-500 text-sm">
                         {new Date(enrolment.enrolledAt).toLocaleDateString('en-NZ')}
                       </TableCell>
                     </TableRow>
@@ -522,7 +524,8 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
               </div>
             ) : (
               <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-                <Table>
+                <Table className="table-stack">
+                  <caption className="sr-only">Attendance and behaviour records</caption>
                   <TableHeader>
                     <TableRow className="bg-slate-50">
                       <TableHead>Date</TableHead>
@@ -533,7 +536,7 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
                   <TableBody>
                     {student.attendance.map((record) => (
                       <TableRow key={record.id}>
-                        <TableCell className="text-slate-700 text-sm">
+                        <TableCell data-label="Date" className="text-slate-700 text-sm">
                           {new Date(record.date).toLocaleDateString('en-NZ', {
                             weekday: 'short',
                             day: 'numeric',
@@ -541,7 +544,7 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
                             year: 'numeric',
                           })}
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Status">
                           <Badge
                             variant={
                               record.status === 'present'
@@ -554,7 +557,7 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
                             {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-slate-500 text-sm">{record.notes ?? '—'}</TableCell>
+                        <TableCell data-label="Notes" className="text-slate-500 text-sm">{record.notes ?? '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

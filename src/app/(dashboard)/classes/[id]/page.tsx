@@ -123,7 +123,8 @@ export default async function ClassDetailPage({ params }: PageProps) {
         {/* Students Tab */}
         <TabsContent value="students">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <Table>
+            <Table className="table-stack">
+              <caption className="sr-only">Enrolled students</caption>
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead>Student Name</TableHead>
@@ -143,22 +144,22 @@ export default async function ClassDetailPage({ params }: PageProps) {
                 ) : (
                   cls.enrolments.map((enrolment) => (
                     <TableRow key={enrolment.id}>
-                      <TableCell className="font-medium">
+                      <TableCell data-label="Student" className="font-medium">
                         <Link href={`/students/${enrolment.student.id}`} className="hover:text-primary">
                           {enrolment.student.user.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="font-mono text-slate-600 text-sm">
+                      <TableCell data-label="Student ID" className="font-mono text-slate-600 text-sm">
                         {enrolment.student.studentId}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Year level">
                         {enrolment.student.yearLevel ? `Year ${enrolment.student.yearLevel}` : '—'}
                       </TableCell>
-                      <TableCell className="text-slate-500 text-sm">
+                      <TableCell data-label="Enrolled at" className="text-slate-500 text-sm">
                         {format(new Date(enrolment.enrolledAt), 'dd MMM yyyy')}
                       </TableCell>
                       {user.role === 'admin' && (
-                        <TableCell className="text-right">
+                        <TableCell data-label="Actions" className="text-right">
                           <form
                             action={async () => {
                               'use server'
@@ -188,7 +189,8 @@ export default async function ClassDetailPage({ params }: PageProps) {
         {/* Timetable Tab */}
         <TabsContent value="timetable">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <Table>
+            <Table className="table-stack">
+              <caption className="sr-only">Class timetable slots</caption>
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead>Day</TableHead>
@@ -209,24 +211,24 @@ export default async function ClassDetailPage({ params }: PageProps) {
                 ) : (
                   cls.timetableSlots.map((slot) => (
                     <TableRow key={slot.id}>
-                      <TableCell className="font-medium">
+                      <TableCell data-label="Day" className="font-medium">
                         {DAY_NAMES[slot.dayOfWeek - 1]}
                       </TableCell>
-                      <TableCell>Period {slot.period}</TableCell>
-                      <TableCell className="text-slate-600">
+                      <TableCell data-label="Period">Period {slot.period}</TableCell>
+                      <TableCell data-label="Time" className="text-slate-600">
                         {slot.startTime} – {slot.endTime}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Room">
                         {slot.room ? (
                           <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">
                             {slot.room.code}
                           </span>
                         ) : '—'}
                       </TableCell>
-                      <TableCell className="text-slate-600">
+                      <TableCell data-label="Staff" className="text-slate-600">
                         {slot.staff?.user.name ?? '—'}
                       </TableCell>
-                      <TableCell className="text-slate-500 text-sm">{slot.notes ?? '—'}</TableCell>
+                      <TableCell data-label="Notes" className="text-slate-500 text-sm">{slot.notes ?? '—'}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -238,7 +240,8 @@ export default async function ClassDetailPage({ params }: PageProps) {
         {/* Gradebooks Tab */}
         <TabsContent value="gradebooks">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <Table>
+            <Table className="table-stack">
+              <caption className="sr-only">Class gradebooks</caption>
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead>Assessment</TableHead>
@@ -260,17 +263,17 @@ export default async function ClassDetailPage({ params }: PageProps) {
                 ) : (
                   cls.gradebooks.map((gb) => (
                     <TableRow key={gb.id}>
-                      <TableCell className="font-medium">{gb.name}</TableCell>
-                      <TableCell className="text-slate-600">{gb.term.name}</TableCell>
-                      <TableCell>
+                      <TableCell data-label="Assessment" className="font-medium">{gb.name}</TableCell>
+                      <TableCell data-label="Term" className="text-slate-600">{gb.term.name}</TableCell>
+                      <TableCell data-label="Type">
                         <Badge variant="outline" className="capitalize">{gb.type}</Badge>
                       </TableCell>
-                      <TableCell className="text-slate-600">
+                      <TableCell data-label="Due date" className="text-slate-600">
                         {gb.dueDate ? format(new Date(gb.dueDate), 'dd MMM yyyy') : '—'}
                       </TableCell>
-                      <TableCell className="text-center">{gb.maxScore}</TableCell>
-                      <TableCell className="text-center">{gb._count.grades}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell data-label="Max score" className="text-center">{gb.maxScore}</TableCell>
+                      <TableCell data-label="Grades" className="text-center">{gb._count.grades}</TableCell>
+                      <TableCell data-label="Actions" className="text-right">
                         <Link href={`/grades/${gb.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>View</Link>
                       </TableCell>
                     </TableRow>

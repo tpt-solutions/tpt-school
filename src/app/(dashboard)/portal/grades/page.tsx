@@ -47,6 +47,7 @@ export default async function PortalGradesPage() {
             ) : (
               <div className="overflow-x-auto">
                 <Table className="table-stack">
+                  <caption className="sr-only">My grades</caption>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Assessment</TableHead>

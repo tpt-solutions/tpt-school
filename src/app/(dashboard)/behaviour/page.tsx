@@ -149,7 +149,8 @@ export default async function BehaviourPage() {
               </Link>
             </div>
           ) : (
-            <Table>
+            <Table className="table-stack">
+              <caption className="sr-only">Behaviour incidents</caption>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -163,10 +164,10 @@ export default async function BehaviourPage() {
               <TableBody>
                 {incidents.map((inc) => (
                   <TableRow key={inc.id}>
-                    <TableCell className="whitespace-nowrap text-sm">
+                    <TableCell data-label="Date" className="whitespace-nowrap text-sm">
                       {format(new Date(inc.date), "dd MMM yyyy")}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Student">
                       <Link
                         href={`/students/${inc.studentId}`}
                         className="font-medium hover:underline"
@@ -174,17 +175,17 @@ export default async function BehaviourPage() {
                         {inc.student.user.name}
                       </Link>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Severity">
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${SEVERITY_COLORS[inc.severity] ?? ""}`}
                       >
                         {inc.severity}
                       </span>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm text-gray-600">
+                    <TableCell data-label="Summary" className="max-w-xs truncate text-sm text-gray-600">
                       {inc.description}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Follow-up">
                       {inc.followUpRequired && !inc.followUpNotes && (
                         <Badge variant="outline" className="text-orange-600">
                           Pending
