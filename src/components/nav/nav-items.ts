@@ -21,6 +21,14 @@ import {
   BookMarked,
   FileText,
   Receipt,
+  UserX,
+  Bus,
+  Utensils,
+  Library,
+  HeartPulse,
+  MessagesSquare,
+  Star,
+  Wallet,
 } from 'lucide-react'
 
 export type NavItem = {
@@ -45,6 +53,14 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Communication', href: '/communication',        icon: MessageSquare },
     { label: 'Finance',       href: '/finance',              icon: DollarSign },
     { label: 'Enrol Requests', href: '/enrollment-requests', icon: FileCheck },
+    { label: 'Substitutes',  href: '/substitutes',  icon: UserX },
+    { label: 'Transport',    href: '/transport',    icon: Bus },
+    { label: 'Canteen',      href: '/canteen',      icon: Utensils },
+    { label: 'Library',      href: '/library',      icon: Library },
+    { label: 'Health room',  href: '/health',       icon: HeartPulse },
+    { label: 'Interviews',   href: '/interviews',   icon: MessagesSquare },
+    { label: 'Merit awards',  href: '/merit',        icon: Star },
+    { label: 'Pay records',  href: '/payroll',      icon: Wallet },
     { label: 'Import templates', href: '/templates',          icon: Download },
     { label: 'Settings',      href: '/settings',             icon: Settings },
   ],
@@ -58,6 +74,7 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Grades',        href: '/grades',          icon: Award },
     { label: 'Behaviour',     href: '/behaviour',       icon: AlertTriangle },
     { label: 'Communication', href: '/communication',   icon: MessageSquare },
+    { label: 'Merit awards', href: '/merit',            icon: Star },
   ],
   parent: [
     { label: 'Dashboard',    href: '/dashboard',        icon: LayoutDashboard },
