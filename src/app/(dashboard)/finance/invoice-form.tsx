@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Trash2 } from 'lucide-react'
+import { centsToDecimalString, formatCents, parseAmountToCents } from '@/lib/money'
 
 type Student = {
   id: string
@@ -26,7 +27,7 @@ type Student = {
 type FeeTypeOption = {
   id: string
   name: string
-  amount: number
+  amountCents: number
 }
 
 type LineItem = {
@@ -50,7 +51,7 @@ export default function InvoiceForm({ students, feeTypes, currencySymbol }: Prop
     { description: '', amount: '', feeTypeId: '' },
   ])
 
-  const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+  const totalCents = items.reduce((sum, item) => sum + (parseAmountToCents(item.amount) ?? 0), 0)
 
   function addItem() {
     setItems(prev => [...prev, { description: '', amount: '', feeTypeId: '' }])
@@ -68,7 +69,7 @@ export default function InvoiceForm({ students, feeTypes, currencySymbol }: Prop
       if (field === 'feeTypeId' && value) {
         const ft = feeTypes.find(f => f.id === value)
         if (ft) {
-          next[index].amount = ft.amount.toString()
+          next[index].amount = centsToDecimalString(ft.amountCents)
           if (!next[index].description) next[index].description = ft.name
         }
       }
@@ -211,7 +212,7 @@ export default function InvoiceForm({ students, feeTypes, currencySymbol }: Prop
               <div className="text-right">
                 <p className="text-sm text-slate-500">Total</p>
                 <p className="text-xl font-bold text-slate-900">
-                  {currencySymbol}{total.toFixed(2)}
+                  {formatCents(totalCents, currencySymbol)}
                 </p>
               </div>
             </div>

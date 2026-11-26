@@ -60,7 +60,7 @@ async function sendFeeReminders(): Promise<{ sent: number; skipped: number; erro
     const primaryParent = invoice.student.parents[0]?.parent
     if (!primaryParent?.user.email) { skipped++; continue }
 
-    const outstanding = invoice.totalAmount - invoice.paidAmount
+    const outstanding = invoice.totalAmountCents - invoice.paidAmountCents
     if (outstanding <= 0) { skipped++; continue }
 
     const html = feeReminderEmailHtml(

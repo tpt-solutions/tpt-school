@@ -22,16 +22,17 @@ import {
 } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { format } from 'date-fns'
+import { formatCents } from '@/lib/money'
 
 type LineItem = {
   id: string
   description: string
-  amount: number
+  amountCents: number
 }
 
 type Payment = {
   id: string
-  amount: number
+  amountCents: number
   method: string
   reference: string | null
   paidAt: Date
@@ -41,8 +42,8 @@ type Props = {
   invoice: {
     id: string
     status: string
-    totalAmount: number
-    paidAmount: number | null
+    totalAmountCents: number
+    paidAmountCents: number
     dueDate: Date
     issueDate: Date
     notes: string | null
@@ -62,8 +63,8 @@ const STATUS_STYLES: Record<string, string> = {
   waived: 'bg-slate-100 text-slate-500',
 }
 
-function fmtCurrency(amount: number, symbol: string) {
-  return `${symbol}${amount.toFixed(2)}`
+function fmtCurrency(cents: number, symbol: string) {
+  return formatCents(cents, symbol)
 }
 
 export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) {
@@ -77,16 +78,15 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
 
-  const balance = invoice.totalAmount - (invoice.paidAmount ?? 0)
+  const balance = invoice.totalAmountCents - invoice.paidAmountCents
 
   function handlePayment(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    const amountNum = parseFloat(amount)
     startTransition(async () => {
       const result = await recordPaymentAction(
         invoice.id,
-        amountNum,
+        amount,
         method,
         reference,
         notes,
@@ -140,13 +140,13 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
             <div>
               <p className="text-xs text-slate-500 mb-1">Total</p>
               <p className="font-bold text-slate-900">
-                {fmtCurrency(invoice.totalAmount, currencySymbol)}
+                {fmtCurrency(invoice.totalAmountCents, currencySymbol)}
               </p>
             </div>
             <div>
               <p className="text-xs text-slate-500 mb-1">Paid</p>
               <p className="font-bold text-green-700">
-                {fmtCurrency(invoice.paidAmount ?? 0, currencySymbol)}
+                {fmtCurrency(invoice.paidAmountCents, currencySymbol)}
               </p>
             </div>
             <div>
@@ -180,14 +180,14 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
                 <tr key={item.id}>
                   <td className="px-4 py-3 text-slate-700">{item.description}</td>
                   <td className="px-4 py-3 text-right text-slate-900">
-                    {fmtCurrency(item.amount, currencySymbol)}
+                    {fmtCurrency(item.amountCents, currencySymbol)}
                   </td>
                 </tr>
               ))}
               <tr className="bg-slate-50 font-semibold">
                 <td className="px-4 py-3 text-slate-900">Total</td>
                 <td className="px-4 py-3 text-right text-slate-900">
-                  {fmtCurrency(invoice.totalAmount, currencySymbol)}
+                  {fmtCurrency(invoice.totalAmountCents, currencySymbol)}
                 </td>
               </tr>
             </tbody>
@@ -229,7 +229,7 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
                     <td className="py-2.5 text-slate-600 capitalize">{p.method}</td>
                     <td className="py-2.5 text-slate-500">{p.reference ?? '—'}</td>
                     <td className="py-2.5 text-right text-green-700 font-medium">
-                      {fmtCurrency(p.amount, currencySymbol)}
+                      {fmtCurrency(p.amountCents, currencySymbol)}
                     </td>
                   </tr>
                 ))}

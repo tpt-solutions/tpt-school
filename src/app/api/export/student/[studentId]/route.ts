@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { logAudit } from '@/lib/audit'
+import { centsToDecimalString } from '@/lib/money'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,10 +100,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
         issueDate: inv.issueDate,
         dueDate: inv.dueDate,
         status: inv.status,
-        total: inv.totalAmount,
-        paid: inv.paidAmount,
-        items: inv.items.map(i => ({ description: i.description, amount: i.amount })),
-        payments: inv.payments.map(p => ({ amount: p.amount, method: p.method, date: p.paidAt })),
+        total: Number(centsToDecimalString(inv.totalAmountCents)),
+        paid: Number(centsToDecimalString(inv.paidAmountCents)),
+        items: inv.items.map(i => ({ description: i.description, amount: Number(centsToDecimalString(i.amountCents)) })),
+        payments: inv.payments.map(p => ({ amount: Number(centsToDecimalString(p.amountCents)), method: p.method, date: p.paidAt })),
       })),
     },
     behaviour: {

@@ -30,8 +30,8 @@ export default async function InvoiceDetailPage({
   const invoiceData = {
     id: invoice.id,
     status: invoice.status,
-    totalAmount: invoice.totalAmount,
-    paidAmount: invoice.paidAmount,
+    totalAmountCents: invoice.totalAmountCents,
+    paidAmountCents: invoice.paidAmountCents,
     dueDate: invoice.dueDate,
     issueDate: invoice.issueDate,
     notes: invoice.notes,
@@ -40,11 +40,11 @@ export default async function InvoiceDetailPage({
     items: invoice.items.map(item => ({
       id: item.id,
       description: item.description,
-      amount: item.amount,
+      amountCents: item.amountCents,
     })),
     payments: invoice.payments.map(p => ({
       id: p.id,
-      amount: p.amount,
+      amountCents: p.amountCents,
       method: p.method,
       reference: p.reference,
       paidAt: p.paidAt,

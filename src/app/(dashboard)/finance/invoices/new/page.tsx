@@ -31,7 +31,7 @@ export default async function NewInvoicePage() {
   const feeTypeOptions = feeTypes.map(ft => ({
     id: ft.id,
     name: ft.name,
-    amount: ft.amount,
+    amountCents: ft.amountCents,
   }))
 
   return (

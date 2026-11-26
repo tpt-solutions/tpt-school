@@ -3,6 +3,7 @@
 import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
+import { parseAmountToCents, formatCents } from '@/lib/money'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendEmail, invoiceEmailHtml } from '@/lib/email'
@@ -25,16 +26,16 @@ export async function createFeeTypeAction(formData: FormData): Promise<{ success
       return { success: false, error: 'Name and amount are required.' }
     }
 
-    const amount = parseFloat(amountRaw)
-    if (isNaN(amount) || amount < 0) {
-      return { success: false, error: 'Amount must be a valid positive number.' }
+    const amountCents = parseAmountToCents(amountRaw)
+    if (amountCents === null) {
+      return { success: false, error: 'Amount must be a valid positive number with at most two decimal places.' }
     }
 
     await db.feeType.create({
       data: {
         name,
         description,
-        amount,
+        amountCents,
         frequency,
         yearLevel: yearLevelRaw ? parseInt(yearLevelRaw, 10) : null,
         active,
@@ -67,9 +68,9 @@ export async function updateFeeTypeAction(
       return { success: false, error: 'Name and amount are required.' }
     }
 
-    const amount = parseFloat(amountRaw)
-    if (isNaN(amount) || amount < 0) {
-      return { success: false, error: 'Amount must be a valid positive number.' }
+    const amountCents = parseAmountToCents(amountRaw)
+    if (amountCents === null) {
+      return { success: false, error: 'Amount must be a valid positive number with at most two decimal places.' }
     }
 
     await db.feeType.update({
@@ -77,7 +78,7 @@ export async function updateFeeTypeAction(
       data: {
         name,
         description,
-        amount,
+        amountCents,
         frequency,
         yearLevel: yearLevelRaw ? parseInt(yearLevelRaw, 10) : null,
         active,
@@ -115,11 +116,14 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
 
     const items = itemDescriptions.map((desc, i) => ({
       description: desc.trim(),
-      amount: parseFloat(itemAmounts[i] ?? '0') || 0,
+      amountCents: parseAmountToCents(itemAmounts[i] ?? '') ?? NaN,
       feeTypeId: itemFeeTypeIds[i] || null,
     }))
+    if (items.some(item => !Number.isInteger(item.amountCents) || item.amountCents < 0)) {
+      return { success: false, error: 'Every line item needs a valid amount (up to two decimal places).' }
+    }
 
-    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
+    const totalAmountCents = items.reduce((sum, item) => sum + item.amountCents, 0)
 
     const invoice = await db.feeInvoice.create({
       data: {
@@ -128,12 +132,12 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
         issueDate: new Date(),
         status: 'unpaid',
         notes,
-        totalAmount,
-        paidAmount: 0,
+        totalAmountCents,
+        paidAmountCents: 0,
         items: {
           create: items.map(item => ({
             description: item.description,
-            amount: item.amount,
+            amountCents: item.amountCents,
             feeTypeId: item.feeTypeId || undefined,
           })),
         },
@@ -157,7 +161,7 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
         sendEmail({
           to: primaryParent.user!.email,
           subject: `Fee invoice — ${student.user.name}`,
-          html: invoiceEmailHtml(primaryParent.user!.name, student.user.name, invoice.id, totalAmount, new Date(dueDateRaw), symbol, schoolName),
+          html: invoiceEmailHtml(primaryParent.user!.name, student.user.name, invoice.id, totalAmountCents, new Date(dueDateRaw), symbol, schoolName),
         }).catch(() => {})
       }).catch(() => {})
     }).catch(() => {})
@@ -175,7 +179,7 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
 
 export async function recordPaymentAction(
   invoiceId: string,
-  amount: number,
+  amountInput: string,
   method: string,
   reference: string,
   notes: string,
@@ -183,8 +187,9 @@ export async function recordPaymentAction(
   try {
     const user = await requireRole(['admin'])
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return { success: false, error: 'Payment amount must be greater than zero.' }
+    const amountCents = parseAmountToCents(amountInput)
+    if (amountCents === null || amountCents <= 0) {
+      return { success: false, error: 'Payment amount must be greater than zero, with at most two decimal places.' }
     }
 
     // Atomic increment inside a transaction: concurrent payments cannot overwrite each other's totals
@@ -192,20 +197,20 @@ export async function recordPaymentAction(
       const invoice = await tx.feeInvoice.findUnique({ where: { id: invoiceId } })
       if (!invoice) return { error: 'Invoice not found.' as const }
 
-      const outstanding = invoice.totalAmount - (invoice.paidAmount ?? 0)
-      if (amount > outstanding + 1e-9) {
+      const outstandingCents = invoice.totalAmountCents - invoice.paidAmountCents
+      if (amountCents > outstandingCents) {
         return { error: 'Payment exceeds the outstanding balance.' as const }
       }
 
       const updated = await tx.feeInvoice.update({
         where: { id: invoiceId },
-        data: { paidAmount: { increment: amount } },
-        select: { paidAmount: true, totalAmount: true, status: true },
+        data: { paidAmountCents: { increment: amountCents } },
+        select: { paidAmountCents: true, totalAmountCents: true, status: true },
       })
       const newStatus =
-        (updated.paidAmount ?? 0) >= updated.totalAmount
+        updated.paidAmountCents >= updated.totalAmountCents
           ? 'paid'
-          : (updated.paidAmount ?? 0) > 0
+          : updated.paidAmountCents > 0
           ? 'partial'
           : updated.status
       await tx.feeInvoice.update({ where: { id: invoiceId }, data: { status: newStatus } })
@@ -213,7 +218,7 @@ export async function recordPaymentAction(
       await tx.feePayment.create({
         data: {
           invoiceId,
-          amount,
+          amountCents,
           method,
           reference: reference || null,
           notes: notes || null,
@@ -226,7 +231,7 @@ export async function recordPaymentAction(
 
     if ('error' in outcome) return { success: false, error: outcome.error }
 
-    await logAudit(user.id, 'CREATE', 'FeePayment', `Recorded ${amount} (${method}) against invoice ${invoiceId}`, invoiceId)
+    await logAudit(user.id, 'CREATE', 'FeePayment', `Recorded ${formatCents(amountCents)} (${method}) against invoice ${invoiceId}`, invoiceId)
 
     revalidatePath('/finance')
     revalidatePath(`/finance/invoices/${invoiceId}`)

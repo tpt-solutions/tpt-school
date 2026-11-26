@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
+import { centsToDecimalString } from '@/lib/money'
 
 export type EmailPayload = {
   to: string
@@ -166,7 +167,7 @@ export function invoiceEmailHtml(
   parentName: string,
   studentName: string,
   invoiceId: string,
-  totalAmount: number,
+  totalAmountCents: number,
   dueDate: Date,
   currencySymbol: string,
   schoolName: string,
@@ -178,7 +179,7 @@ export function invoiceEmailHtml(
       <p>A fee invoice has been generated for <strong>${studentName}</strong>.</p>
       <table style="border-collapse:collapse;margin:16px 0">
         <tr><td style="padding:4px 8px;font-weight:bold">Invoice ID:</td><td style="padding:4px 8px">${invoiceId.slice(0, 8).toUpperCase()}</td></tr>
-        <tr><td style="padding:4px 8px;font-weight:bold">Amount Due:</td><td style="padding:4px 8px">${currencySymbol}${totalAmount.toFixed(2)}</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:bold">Amount Due:</td><td style="padding:4px 8px">${currencySymbol}${centsToDecimalString(totalAmountCents)}</td></tr>
         <tr><td style="padding:4px 8px;font-weight:bold">Due Date:</td><td style="padding:4px 8px">${dueDate.toLocaleDateString()}</td></tr>
       </table>
       <p>Please contact the school office to arrange payment.</p>
@@ -245,7 +246,7 @@ export function feeReminderEmailHtml(
   parentName: string,
   studentName: string,
   invoiceId: string,
-  outstandingAmount: number,
+  outstandingCents: number,
   dueDate: Date,
   currencySymbol: string,
   schoolName: string,
@@ -258,7 +259,7 @@ export function feeReminderEmailHtml(
       <p>This is a reminder that an outstanding fee invoice for <strong>${studentName}</strong> is overdue.</p>
       <table style="border-collapse:collapse;margin:16px 0">
         <tr><td style="padding:4px 8px;font-weight:bold">Invoice ID:</td><td style="padding:4px 8px">${invoiceId.slice(0, 8).toUpperCase()}</td></tr>
-        <tr><td style="padding:4px 8px;font-weight:bold">Outstanding:</td><td style="padding:4px 8px;color:#dc2626;font-weight:bold">${currencySymbol}${outstandingAmount.toFixed(2)}</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:bold">Outstanding:</td><td style="padding:4px 8px;color:#dc2626;font-weight:bold">${currencySymbol}${centsToDecimalString(outstandingCents)}</td></tr>
         <tr><td style="padding:4px 8px;font-weight:bold">Due Date:</td><td style="padding:4px 8px">${dueDate.toLocaleDateString()}${overdueDays > 0 ? ` (${overdueDays} day${overdueDays > 1 ? 's' : ''} overdue)` : ''}</td></tr>
       </table>
       <p>Please contact the school office to arrange payment at your earliest convenience.</p>

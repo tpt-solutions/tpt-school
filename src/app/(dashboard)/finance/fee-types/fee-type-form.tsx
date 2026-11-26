@@ -14,12 +14,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { centsToDecimalString } from '@/lib/money'
 
 type FeeType = {
   id: string
   name: string
   description: string | null
-  amount: number
+  amountCents: number
   frequency: string
   yearLevel: number | null
   active: boolean
@@ -103,7 +104,7 @@ export default function FeeTypeForm({ feeType, onSuccess, currencySymbol }: Prop
                 type="number"
                 step="0.01"
                 min="0"
-                defaultValue={feeType?.amount}
+                defaultValue={feeType ? centsToDecimalString(feeType.amountCents) : undefined}
                 placeholder="0.00"
                 required
               />

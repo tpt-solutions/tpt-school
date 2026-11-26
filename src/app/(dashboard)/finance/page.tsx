@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, DollarSign, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import { format } from 'date-fns'
 import FeeReminderButton from './fee-reminder-button'
+import { formatCents } from '@/lib/money'
 
 const STATUS_STYLES: Record<string, string> = {
   unpaid: 'bg-yellow-100 text-yellow-700',
@@ -24,8 +25,8 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function formatCurrency(amount: number, symbol: string) {
-  return `${symbol}${amount.toFixed(2)}`
+function formatCurrency(cents: number, symbol: string) {
+  return formatCents(cents, symbol)
 }
 
 export default async function FinancePage() {
@@ -36,7 +37,7 @@ export default async function FinancePage() {
 
   // Overview stats
   const [unpaidInvoices, overdueInvoices, allInvoices] = await Promise.all([
-    db.feeInvoice.findMany({ where: { status: { in: ['unpaid', 'partial'] } }, select: { totalAmount: true, paidAmount: true } }),
+    db.feeInvoice.findMany({ where: { status: { in: ['unpaid', 'partial'] } }, select: { totalAmountCents: true, paidAmountCents: true } }),
     db.feeInvoice.count({ where: { status: 'overdue' } }),
     db.feeInvoice.findMany({
       include: {
@@ -47,7 +48,7 @@ export default async function FinancePage() {
   ])
 
   const totalOutstanding = unpaidInvoices.reduce(
-    (sum, inv) => sum + (inv.totalAmount - (inv.paidAmount ?? 0)),
+    (sum, inv) => sum + (inv.totalAmountCents - inv.paidAmountCents),
     0,
   )
 
@@ -56,7 +57,7 @@ export default async function FinancePage() {
   termStart.setDate(1)
   const paidThisTerm = await db.feePayment.aggregate({
     where: { paidAt: { gte: termStart } },
-    _sum: { amount: true },
+    _sum: { amountCents: true },
   })
 
   const feeTypes = await db.feeType.findMany({ orderBy: { name: 'asc' } })
@@ -103,7 +104,7 @@ export default async function FinancePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-slate-900">
-              {formatCurrency(paidThisTerm._sum.amount ?? 0, currencySymbol)}
+              {formatCurrency(paidThisTerm._sum.amountCents ?? 0, currencySymbol)}
             </div>
             <p className="text-xs text-slate-500 mt-1">Total payments received</p>
           </CardContent>
@@ -164,10 +165,10 @@ export default async function FinancePage() {
                         {format(new Date(inv.dueDate), 'dd MMM yyyy')}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-900">
-                        {formatCurrency(inv.totalAmount, currencySymbol)}
+                        {formatCurrency(inv.totalAmountCents, currencySymbol)}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-600">
-                        {formatCurrency(inv.paidAmount ?? 0, currencySymbol)}
+                        {formatCurrency(inv.paidAmountCents, currencySymbol)}
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={inv.status} />
@@ -216,7 +217,7 @@ export default async function FinancePage() {
                     <tr key={ft.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3 font-medium text-slate-900">{ft.name}</td>
                       <td className="px-4 py-3 text-right text-slate-900">
-                        {formatCurrency(ft.amount, currencySymbol)}
+                        {formatCurrency(ft.amountCents, currencySymbol)}
                       </td>
                       <td className="px-4 py-3 text-slate-600 capitalize">{ft.frequency}</td>
                       <td className="px-4 py-3 text-slate-600">

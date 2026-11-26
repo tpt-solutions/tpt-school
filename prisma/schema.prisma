@@ -568,7 +568,7 @@ model FeeType {
   id           String           @id @default(cuid())
   name         String
   description  String?
-  amount       Float
+  amountCents  Int              // stored in cents
   frequency    String           @default("annual")
   yearLevel    Int?
   active       Boolean          @default(true)
@@ -582,8 +582,8 @@ model FeeInvoice {
   dueDate     DateTime
   status      String           @default("unpaid")
   notes       String?
-  totalAmount Float
-  paidAmount  Float            @default(0)
+  totalAmountCents Int         // stored in cents
+  paidAmountCents  Int         @default(0) // stored in cents
   lastReminderSentAt DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
@@ -600,7 +600,7 @@ model FeeInvoiceItem {
   invoiceId   String
   feeTypeId   String?
   description String
-  amount      Float
+  amountCents Int        // stored in cents
   invoice     FeeInvoice @relation(fields: [invoiceId], references: [id])
   feeType     FeeType?   @relation(fields: [feeTypeId], references: [id])
 }
@@ -608,7 +608,7 @@ model FeeInvoiceItem {
 model FeePayment {
   id         String     @id @default(cuid())
   invoiceId  String
-  amount     Float
+  amountCents Int       // stored in cents
   method     String     @default("cash")
   reference  String?
   paidAt     DateTime   @default(now())

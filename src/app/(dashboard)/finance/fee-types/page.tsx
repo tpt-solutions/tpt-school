@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import FeeTypeForm from './fee-type-form'
 import { Card, CardContent } from '@/components/ui/card'
+import { formatCents } from '@/lib/money'
 
-function formatCurrency(amount: number, symbol: string) {
-  return `${symbol}${amount.toFixed(2)}`
+function formatCurrency(cents: number, symbol: string) {
+  return formatCents(cents, symbol)
 }
 
 export default async function FeeTypesPage() {
@@ -65,7 +66,7 @@ export default async function FeeTypesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-slate-900">
-                        {formatCurrency(ft.amount, currencySymbol)}
+                        {formatCurrency(ft.amountCents, currencySymbol)}
                       </td>
                       <td className="px-4 py-3 text-slate-600 capitalize">{ft.frequency}</td>
                       <td className="px-4 py-3 text-slate-600">
