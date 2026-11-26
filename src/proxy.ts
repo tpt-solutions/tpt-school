@@ -1,7 +1,20 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/login', '/setup', '/unauthorized', '/forgot-password', '/reset-password']
+const PUBLIC_PATHS = [
+  '/login',
+  '/setup',
+  '/unauthorized',
+  '/forgot-password',
+  '/reset-password',
+  // PWA assets must load before sign-in (install prompt, offline page).
+  '/offline',
+  '/manifest.json',
+  '/sw.js',
+  '/icons',
+  // Calendar apps fetch this without cookies. The route checks its own signed token.
+  '/api/calendar/feed',
+]
 
 /** Matches the path exactly or as a whole segment prefix: '/login' and '/login/x' match, '/loginfoo' does not. */
 function isPublicPath(pathname: string): boolean {
