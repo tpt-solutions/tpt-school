@@ -7,7 +7,8 @@ import { parseAmountToCents, formatCents } from '@/lib/money'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendEmail, invoiceEmailHtml } from '@/lib/email'
-import { runFeeReminders } from '@/app/api/cron/fee-reminders/route'
+import { field, parseWith } from '@/lib/form'
+import { sendFeeReminders } from '@/lib/fee-reminders'
 
 // ─── Fee Types ────────────────────────────────────────────────────────────────
 
@@ -18,8 +19,12 @@ export async function createFeeTypeAction(formData: FormData): Promise<{ success
     const name = (formData.get('name') as string)?.trim()
     const description = (formData.get('description') as string)?.trim() || null
     const amountRaw = formData.get('amount') as string
-    const frequency = (formData.get('frequency') as string) || 'annual'
-    const yearLevelRaw = formData.get('yearLevel') as string
+    const frequencyParsed = parseWith(field.oneOf('Frequency', ['annual', 'term'] as const), (formData.get('frequency') as string | null) || 'annual')
+    if (!frequencyParsed.ok) return { success: false, error: frequencyParsed.error }
+    const frequency = frequencyParsed.data
+    const yearLevelParsed = parseWith(field.optionalInt('Year level', 0, 20), (formData.get('yearLevel') as string | null) ?? '')
+    if (!yearLevelParsed.ok) return { success: false, error: yearLevelParsed.error }
+    const yearLevel = yearLevelParsed.data
     const active = formData.get('active') !== 'false'
 
     if (!name || !amountRaw) {
@@ -37,7 +42,7 @@ export async function createFeeTypeAction(formData: FormData): Promise<{ success
         description,
         amountCents,
         frequency,
-        yearLevel: yearLevelRaw ? parseInt(yearLevelRaw, 10) : null,
+        yearLevel,
         active,
       },
     })
@@ -60,8 +65,12 @@ export async function updateFeeTypeAction(
     const name = (formData.get('name') as string)?.trim()
     const description = (formData.get('description') as string)?.trim() || null
     const amountRaw = formData.get('amount') as string
-    const frequency = (formData.get('frequency') as string) || 'annual'
-    const yearLevelRaw = formData.get('yearLevel') as string
+    const frequencyParsed = parseWith(field.oneOf('Frequency', ['annual', 'term'] as const), (formData.get('frequency') as string | null) || 'annual')
+    if (!frequencyParsed.ok) return { success: false, error: frequencyParsed.error }
+    const frequency = frequencyParsed.data
+    const yearLevelParsed = parseWith(field.optionalInt('Year level', 0, 20), (formData.get('yearLevel') as string | null) ?? '')
+    if (!yearLevelParsed.ok) return { success: false, error: yearLevelParsed.error }
+    const yearLevel = yearLevelParsed.data
     const active = formData.get('active') === 'true'
 
     if (!name || !amountRaw) {
@@ -80,7 +89,7 @@ export async function updateFeeTypeAction(
         description,
         amountCents,
         frequency,
-        yearLevel: yearLevelRaw ? parseInt(yearLevelRaw, 10) : null,
+        yearLevel,
         active,
       },
     })
@@ -109,6 +118,9 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
     if (!studentId || !dueDateRaw) {
       return { success: false, error: 'Student and due date are required.' }
     }
+    const dueParsed = parseWith(field.date('Due date'), dueDateRaw)
+    if (!dueParsed.ok) return { success: false, error: dueParsed.error }
+    const dueDate = dueParsed.data
 
     if (itemDescriptions.length === 0) {
       return { success: false, error: 'At least one line item is required.' }
@@ -128,7 +140,7 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
     const invoice = await db.feeInvoice.create({
       data: {
         studentId,
-        dueDate: new Date(dueDateRaw),
+        dueDate,
         issueDate: new Date(),
         status: 'unpaid',
         notes,
@@ -161,7 +173,7 @@ export async function createInvoiceAction(formData: FormData): Promise<{ success
         sendEmail({
           to: primaryParent.user!.email,
           subject: `Fee invoice — ${student.user.name}`,
-          html: invoiceEmailHtml(primaryParent.user!.name, student.user.name, invoice.id, totalAmountCents, new Date(dueDateRaw), symbol, schoolName),
+          html: invoiceEmailHtml(primaryParent.user!.name, student.user.name, invoice.id, totalAmountCents, dueDate, symbol, schoolName),
         }).catch(() => {})
       }).catch(() => {})
     }).catch(() => {})
@@ -253,7 +265,7 @@ export async function triggerFeeRemindersAction(): Promise<{
 }> {
   try {
     await requireRole(['admin'])
-    const result = await runFeeReminders()
+    const result = await sendFeeReminders()
     return { success: true, ...result }
   } catch (err: unknown) {
     console.error('triggerFeeRemindersAction error:', err)
