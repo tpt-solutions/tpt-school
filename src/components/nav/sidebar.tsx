@@ -15,6 +15,7 @@ import {
   MessageSquare,
   DollarSign,
   Settings,
+  Download,
   GraduationCap,
   Bell,
   AlertTriangle,
@@ -46,6 +47,7 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Communication', href: '/communication',        icon: MessageSquare },
     { label: 'Finance',       href: '/finance',              icon: DollarSign },
     { label: 'Enrol Requests', href: '/enrollment-requests', icon: FileCheck },
+    { label: 'Import templates', href: '/templates',          icon: Download },
     { label: 'Settings',      href: '/settings',             icon: Settings },
   ],
   teacher: [

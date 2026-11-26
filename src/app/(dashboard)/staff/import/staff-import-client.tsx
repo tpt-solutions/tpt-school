@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import CsvImportTable, { CsvRow } from '@/components/csv-import-table'
 import { importStaffAction, ImportStaffRow } from './actions'
-import { Upload } from 'lucide-react'
+import { Download, Upload } from 'lucide-react'
 
 const COLUMNS = ['firstName', 'lastName', 'email', 'jobTitle', 'department', 'employmentType', 'dateHired']
 
@@ -113,6 +113,14 @@ export default function StaffImportClient() {
           <p className="text-xs text-slate-500">
             employmentType: full-time | part-time | casual | contract. Dates in YYYY-MM-DD format. Staff with existing email are skipped.
           </p>
+          <a
+            href="/templates/staff-template.csv"
+            download
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+          >
+            <Download className="w-4 h-4" />
+            Download blank template with example rows
+          </a>
         </CardContent>
       </Card>
 

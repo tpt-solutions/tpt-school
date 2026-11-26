@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import CsvImportTable, { CsvRow } from '@/components/csv-import-table'
 import { importStudentsAction, ImportStudentRow } from './actions'
-import { Upload } from 'lucide-react'
+import { Download, Upload } from 'lucide-react'
 
 const COLUMNS = ['firstName', 'lastName', 'email', 'dateOfBirth', 'gender', 'yearLevel', 'enrollmentDate']
 const REQUIRED = ['firstName', 'lastName', 'email']
@@ -119,6 +119,14 @@ export default function StudentImportClient() {
           <p className="text-xs text-slate-500">
             Dates should be in YYYY-MM-DD format. Students with an existing email will be skipped. Each imported student gets a random temporary password.
           </p>
+          <a
+            href="/templates/students-template.csv"
+            download
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+          >
+            <Download className="w-4 h-4" />
+            Download blank template with example rows
+          </a>
         </CardContent>
       </Card>
 
