@@ -205,6 +205,37 @@ export async function deleteStudentAction(id: string): Promise<{ success: boolea
   }
 }
 
+// ─── Bulk status ─────────────────────────────────────────────────────────────
+
+/**
+ * Deactivates or reactivates many students at once. Uses the same rules as the
+ * single-student soft delete: the enrolment status and the login both change.
+ * Used directly as a form action, so it returns nothing; failures are no-ops.
+ */
+export async function bulkSetStudentStatusAction(formData: FormData): Promise<void> {
+  const actor = await requireRole(['admin'])
+
+  const status = formData.get('status')
+  if (status !== 'active' && status !== 'inactive') return
+
+  const ids = formData
+    .getAll('ids')
+    .filter((v): v is string => typeof v === 'string' && v.length > 0 && v.length <= 64)
+    .slice(0, 200)
+  if (ids.length === 0) return
+
+  const students = await db.student.findMany({ where: { id: { in: ids } }, select: { id: true, userId: true } })
+  if (students.length === 0) return
+
+  await db.$transaction([
+    db.student.updateMany({ where: { id: { in: students.map((s) => s.id) } }, data: { enrollmentStatus: status } }),
+    db.user.updateMany({ where: { id: { in: students.map((s) => s.userId) } }, data: { active: status === 'active' } }),
+  ])
+
+  await logAudit(actor.id, 'UPDATE', 'Student', `Bulk set ${students.length} student(s) to ${status}`)
+  revalidatePath('/students')
+}
+
 // ─── Transfer In ─────────────────────────────────────────────────────────────
 
 export async function recordTransferInAction(

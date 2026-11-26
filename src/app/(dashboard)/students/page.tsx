@@ -20,10 +20,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { UserPlus, Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { bulkSetStudentStatusAction } from './actions'
 
 const PAGE_SIZE = 50
 
-type SearchParams = Promise<{ q?: string; yearLevel?: string; status?: string; page?: string }>
+type SearchParams = Promise<{ q?: string; yearLevel?: string; status?: string; page?: string; sort?: string; dir?: string }>
+
+type StudentOrder = NonNullable<NonNullable<Parameters<typeof db.student.findMany>[0]>['orderBy']>
+
+const SORT_COLUMNS = ['name', 'yearLevel', 'enrolled'] as const
+type SortColumn = typeof SORT_COLUMNS[number]
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   active: { label: 'Active', variant: 'default' },
@@ -35,7 +41,16 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
 export default async function StudentsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireRole(['admin', 'teacher'])
 
-  const { q = '', yearLevel = '', status = '', page: pageParam = '1' } = await searchParams
+  const { q = '', yearLevel = '', status = '', page: pageParam = '1', sort: sortParam, dir: dirParam } = await searchParams
+
+  // Whitelisted sort columns only; the direction defaults to the natural order for each column
+  const sort: SortColumn = (SORT_COLUMNS as readonly string[]).includes(sortParam ?? '') ? (sortParam as SortColumn) : 'enrolled'
+  const defaultDir = sort === 'name' || sort === 'yearLevel' ? 'asc' : 'desc'
+  const dir: 'asc' | 'desc' = dirParam === 'asc' || dirParam === 'desc' ? dirParam : defaultDir
+  const orderBy: StudentOrder =
+    sort === 'name' ? [{ user: { name: dir } }, { id: 'asc' }] :
+    sort === 'yearLevel' ? [{ yearLevel: dir }, { user: { name: 'asc' } }, { id: 'asc' }] :
+    [{ enrollmentDate: dir }, { id: 'asc' }]
 
   const where = {
     AND: [
@@ -61,7 +76,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
   const students = await db.student.findMany({
     where,
     include: { user: { select: { name: true, email: true } } },
-    orderBy: [{ enrollmentDate: 'desc' }, { id: 'asc' }],
+    orderBy,
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
   })
@@ -71,10 +86,26 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
     if (q) params.set('q', q)
     if (yearLevel) params.set('yearLevel', yearLevel)
     if (status) params.set('status', status)
+    if (sortParam && sort !== 'enrolled') params.set('sort', sort)
+    if (dirParam && dir !== defaultDir) params.set('dir', dir)
     if (target > 1) params.set('page', String(target))
     const qs = params.toString()
     return qs ? `/students?${qs}` : '/students'
   }
+
+  // Clicking a column header sorts by it; clicking the active column flips the direction
+  const sortHref = (column: SortColumn) => {
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    if (yearLevel) params.set('yearLevel', yearLevel)
+    if (status) params.set('status', status)
+    params.set('sort', column)
+    const nextDefault = column === 'name' || column === 'yearLevel' ? 'asc' : 'desc'
+    const nextDir = column === sort ? (dir === 'asc' ? 'desc' : 'asc') : nextDefault
+    if (nextDir !== nextDefault) params.set('dir', nextDir)
+    return `/students?${params.toString()}`
+  }
+  const sortIndicator = (column: SortColumn) => (sort === column ? (dir === 'asc' ? ' ↑' : ' ↓') : '')
 
   return (
     <div className="space-y-6">
@@ -90,6 +121,10 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
           <Link href="/students/import" className={buttonVariants({ variant: 'outline' })}>
             <Upload className="w-4 h-4" />
             Import CSV
+          </Link>
+          <Link href="/students/guardians/import" className={buttonVariants({ variant: 'outline' })}>
+            <Upload className="w-4 h-4" />
+            Import guardians
           </Link>
           <Link href="/students/new" className={buttonVariants()}>
             <UserPlus className="w-4 h-4" />
@@ -143,23 +178,37 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
       </form>
 
       {/* Table */}
+      <form id="bulk-students" action={bulkSetStudentStatusAction} className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label htmlFor="bulk-status" className="text-slate-600">With selected students:</label>
+          <select id="bulk-status" name="status" defaultValue="inactive" className="h-9 rounded-md border border-input bg-transparent px-2">
+            <option value="inactive">Deactivate</option>
+            <option value="active">Reactivate</option>
+          </select>
+          <button type="submit" className={buttonVariants({ variant: 'outline', size: 'sm' })}>Apply</button>
+        </div>
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         <Table className="table-stack">
+          <caption className="sr-only">Students</caption>
           <TableHeader>
             <TableRow className="bg-slate-50">
+              <TableHead className="w-10"><span className="sr-only">Select</span></TableHead>
               <TableHead className="font-semibold text-slate-700">Student ID</TableHead>
-              <TableHead className="font-semibold text-slate-700">Name</TableHead>
-              <TableHead className="font-semibold text-slate-700">Year Level</TableHead>
+              <TableHead className="font-semibold text-slate-700"><Link href={sortHref('name')} className="hover:underline">Name{sortIndicator('name')}</Link></TableHead>
+              <TableHead className="font-semibold text-slate-700"><Link href={sortHref('yearLevel')} className="hover:underline">Year Level{sortIndicator('yearLevel')}</Link></TableHead>
               <TableHead className="font-semibold text-slate-700">Status</TableHead>
-              <TableHead className="font-semibold text-slate-700">Enrolment Date</TableHead>
+              <TableHead className="font-semibold text-slate-700"><Link href={sortHref('enrolled')} className="hover:underline">Enrolment Date{sortIndicator('enrolled')}</Link></TableHead>
               <TableHead className="font-semibold text-slate-700 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {students.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-slate-400">
-                  No students found. Try adjusting your search or filters.
+                <TableCell colSpan={7} className="text-center py-12 text-slate-400">
+                  <p>No students found. Try adjusting your search or filters.</p>
+                  <Link href="/students/new" className={buttonVariants({ size: 'sm' }) + ' mt-3'}>
+                    Enrol a student
+                  </Link>
                 </TableCell>
               </TableRow>
             ) : (
@@ -170,6 +219,9 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
                 }
                 return (
                   <TableRow key={student.id} className="hover:bg-slate-50/50">
+                    <TableCell data-label="Select">
+                      <input type="checkbox" name="ids" value={student.id} aria-label={`Select ${student.user.name}`} className="size-4" />
+                    </TableCell>
                     <TableCell data-label="Student ID" className="font-mono text-sm text-slate-600">
                       {student.studentId}
                     </TableCell>
@@ -207,6 +259,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
           </TableBody>
         </Table>
       </div>
+      </form>
 
       {pageCount > 1 && (
         <div className="flex items-center justify-between text-sm text-slate-600">
