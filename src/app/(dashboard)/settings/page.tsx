@@ -11,6 +11,7 @@ import RoomsForm from './rooms-form'
 import MessagingForm from './messaging-form'
 import RolloverForm from './rollover-form'
 import AbsenceEmailForm from './absence-email-form'
+import DemoDataForm from './demo-data-form'
 
 export default async function SettingsPage() {
   const user = await requireRole(['admin'])
@@ -75,6 +76,7 @@ export default async function SettingsPage() {
           <TabsTrigger value="rooms">Rooms</TabsTrigger>
           <TabsTrigger value="messaging">Messaging</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          <TabsTrigger value="demo">Demo data</TabsTrigger>
         </TabsList>
 
         <TabsContent value="school" className="mt-6 max-w-2xl">
@@ -115,6 +117,10 @@ export default async function SettingsPage() {
             <MessagingForm parentMessagingDefault={settings?.parentMessagingDefault ?? true} />
             <AbsenceEmailForm enabled={settings?.absenceEmailsEnabled ?? false} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="demo" className="mt-6 max-w-2xl">
+          <DemoDataForm />
         </TabsContent>
 
         <TabsContent value="audit" className="mt-6">
