@@ -1,12 +1,15 @@
 import 'dotenv/config'
 import bcrypt from 'bcryptjs'
 import path from 'node:path'
+import { randomBytes } from 'node:crypto'
 import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 
 const ADMIN_EMAIL = 'admin@school.ac.nz'
-const ADMIN_PASSWORD = 'REDACTED-ADMIN-PW'
-const DEMO_PASSWORD = 'REDACTED-DEMO-PW'
+// Generated per run so no fixed password is kept in source control.
+// The values are printed once, when the accounts are created.
+const ADMIN_PASSWORD = randomBytes(12).toString('base64url')
+const DEMO_PASSWORD = randomBytes(9).toString('base64url')
 
 function createDb(): PrismaClient {
   const dbUrl = process.env.DATABASE_URL ?? 'file:./dev.db'
