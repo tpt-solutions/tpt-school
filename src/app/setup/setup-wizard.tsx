@@ -25,11 +25,45 @@ type AdminInfo = {
   confirmPassword: string
 }
 
-const STEPS = ['School Info', 'Admin Account', 'Review & Confirm']
+type TermDraft = {
+  name: string
+  startDate: string
+  endDate: string
+}
+
+type AcademicYearDraft = {
+  startDate: string
+  endDate: string
+  terms: TermDraft[]
+}
+
+const STEPS = ['School Info', 'Academic Year', 'Admin Account', 'Review & Confirm']
+const MAX_TERMS = 4
+
+/** 20 characters from a 64-symbol alphabet, drawn with the Web Crypto API (no modulo bias: 64 divides 256). */
+function generateStrongPassword(length = 20): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789-_!#%+=@'
+  const bytes = new Uint8Array(length)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, b => alphabet[b % alphabet.length]).join('')
+}
+
+/** Sensible starting dates for a Feb–Dec year split into two terms. The admin can edit them. */
+function defaultAcademicYear(year: number): AcademicYearDraft {
+  return {
+    startDate: `${year}-02-01`,
+    endDate: `${year}-12-15`,
+    terms: [
+      { name: 'Term 1', startDate: `${year}-02-01`, endDate: `${year}-06-30` },
+      { name: 'Term 2', startDate: `${year}-07-01`, endDate: `${year}-12-15` },
+    ],
+  }
+}
 
 export default function SetupWizard() {
   const [step, setStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [generatedHint, setGeneratedHint] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({
@@ -41,6 +75,10 @@ export default function SetupWizard() {
     schoolType: 'both',
     currentYear: new Date().getFullYear().toString(),
   })
+
+  const [yearInfo, setYearInfo] = useState<AcademicYearDraft>(() =>
+    defaultAcademicYear(new Date().getFullYear())
+  )
 
   const [adminInfo, setAdminInfo] = useState<AdminInfo>({
     name: '',
@@ -63,6 +101,50 @@ export default function SetupWizard() {
     return null
   }
 
+  function fillGeneratedPassword() {
+    const password = generateStrongPassword()
+    setAdminInfo(prev => ({ ...prev, password, confirmPassword: password }))
+    setGeneratedHint(true)
+  }
+
+  function updateYear(field: 'startDate' | 'endDate', value: string) {
+    setYearInfo(prev => ({ ...prev, [field]: value }))
+  }
+
+  function updateTerm(index: number, field: keyof TermDraft, value: string) {
+    setYearInfo(prev => ({
+      ...prev,
+      terms: prev.terms.map((t, i) => (i === index ? { ...t, [field]: value } : t)),
+    }))
+  }
+
+  function addTerm() {
+    setYearInfo(prev => {
+      if (prev.terms.length >= MAX_TERMS) return prev
+      const last = prev.terms[prev.terms.length - 1]
+      return {
+        ...prev,
+        terms: [...prev.terms, { name: `Term ${prev.terms.length + 1}`, startDate: last?.endDate ?? prev.startDate, endDate: prev.endDate }],
+      }
+    })
+  }
+
+  function removeTerm(index: number) {
+    setYearInfo(prev => ({ ...prev, terms: prev.terms.filter((_, i) => i !== index) }))
+  }
+
+  function validateYearStep() {
+    if (!yearInfo.startDate || !yearInfo.endDate) return 'Enter the start and end dates of the academic year.'
+    if (yearInfo.startDate >= yearInfo.endDate) return 'The academic year must end after it starts.'
+    if (yearInfo.terms.length === 0) return 'Add at least one term.'
+    for (const t of yearInfo.terms) {
+      if (!t.name.trim()) return 'Every term needs a name.'
+      if (!t.startDate || !t.endDate) return `Enter the dates for ${t.name || 'each term'}.`
+      if (t.startDate >= t.endDate) return `${t.name} must end after it starts.`
+    }
+    return null
+  }
+
   function validateStep2() {
     if (!adminInfo.name.trim()) return 'Admin name is required.'
     if (!adminInfo.email.trim()) return 'Admin email is required.'
@@ -76,8 +158,17 @@ export default function SetupWizard() {
     if (step === 0) {
       const err = validateStep1()
       if (err) { setError(err); return }
+      // Re-seed the year dates if the admin changed the current year since they were set.
+      const currentYear = Number(schoolInfo.currentYear)
+      if (!yearInfo.startDate.startsWith(`${currentYear}-`)) {
+        setYearInfo(defaultAcademicYear(currentYear))
+      }
     }
     if (step === 1) {
+      const err = validateYearStep()
+      if (err) { setError(err); return }
+    }
+    if (step === 2) {
       const err = validateStep2()
       if (err) { setError(err); return }
     }
@@ -92,12 +183,11 @@ export default function SetupWizard() {
   function handleSubmit() {
     setError(null)
     startTransition(async () => {
-      const result = await completeSetupAction(schoolInfo, adminInfo)
+      const result = await completeSetupAction(schoolInfo, adminInfo, yearInfo)
       if (result.success) {
         window.location.href = '/dashboard'
       } else {
         setError(result.error ?? 'Setup failed. Please try again.')
-        setStep(0)
       }
     })
   }
@@ -215,8 +305,97 @@ export default function SetupWizard() {
           </>
         )}
 
-        {/* Step 2: Admin Account */}
+        {/* Step 2: Academic Year & Terms */}
         {step === 1 && (
+          <>
+            <CardHeader>
+              <CardTitle>Academic Year &amp; Terms</CardTitle>
+              <CardDescription>
+                Set up the first academic year. You can add more years and change terms later in Settings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="year-start">Year Starts <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="year-start"
+                    type="date"
+                    value={yearInfo.startDate}
+                    onChange={e => updateYear('startDate', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="year-end">Year Ends <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="year-end"
+                    type="date"
+                    value={yearInfo.endDate}
+                    onChange={e => updateYear('endDate', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700">Terms</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addTerm}
+                    disabled={yearInfo.terms.length >= MAX_TERMS}
+                  >
+                    Add term
+                  </Button>
+                </div>
+                {yearInfo.terms.map((term, i) => (
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end rounded-lg border border-slate-100 p-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`term-name-${i}`}>Name</Label>
+                      <Input
+                        id={`term-name-${i}`}
+                        value={term.name}
+                        onChange={e => updateTerm(i, 'name', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`term-start-${i}`}>Starts</Label>
+                      <Input
+                        id={`term-start-${i}`}
+                        type="date"
+                        value={term.startDate}
+                        onChange={e => updateTerm(i, 'startDate', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`term-end-${i}`}>Ends</Label>
+                      <Input
+                        id={`term-end-${i}`}
+                        type="date"
+                        value={term.endDate}
+                        onChange={e => updateTerm(i, 'endDate', e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeTerm(i)}
+                      disabled={yearInfo.terms.length <= 1}
+                      aria-label={`Remove ${term.name || 'term'}`}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </>
+        )}
+
+        {/* Step 3: Admin Account */}
+        {step === 2 && (
           <>
             <CardHeader>
               <CardTitle>Administrator Account</CardTitle>
@@ -264,6 +443,16 @@ export default function SetupWizard() {
                   />
                 </div>
               </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" size="sm" onClick={fillGeneratedPassword}>
+                  Generate a strong password
+                </Button>
+                {generatedHint && (
+                  <p role="status" className="text-xs text-slate-600">
+                    Copy this password somewhere safe now. It is not shown again after setup.
+                  </p>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
                 You can add more staff and configure additional settings after setup.
               </p>
@@ -271,8 +460,8 @@ export default function SetupWizard() {
           </>
         )}
 
-        {/* Step 3: Review */}
-        {step === 2 && (
+        {/* Step 4: Review */}
+        {step === 3 && (
           <>
             <CardHeader>
               <CardTitle>Review &amp; Confirm</CardTitle>
@@ -294,6 +483,21 @@ export default function SetupWizard() {
                     <div key={label} className="flex px-4 py-2.5 bg-white even:bg-slate-50/50 text-sm">
                       <dt className="w-36 font-medium text-slate-500 flex-shrink-0">{label}</dt>
                       <dd className="text-slate-900">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">Academic Year</h3>
+                <dl className="divide-y divide-slate-100 rounded-lg border border-slate-100 overflow-hidden">
+                  <div className="flex px-4 py-2.5 bg-white text-sm">
+                    <dt className="w-36 font-medium text-slate-500 flex-shrink-0">Period</dt>
+                    <dd className="text-slate-900">{yearInfo.startDate} to {yearInfo.endDate}</dd>
+                  </div>
+                  {yearInfo.terms.map((t, i) => (
+                    <div key={i} className="flex px-4 py-2.5 bg-white even:bg-slate-50/50 text-sm">
+                      <dt className="w-36 font-medium text-slate-500 flex-shrink-0">{t.name}</dt>
+                      <dd className="text-slate-900">{t.startDate} to {t.endDate}</dd>
                     </div>
                   ))}
                 </dl>
@@ -333,7 +537,7 @@ export default function SetupWizard() {
           >
             Back
           </Button>
-          {step < 2 ? (
+          {step < 3 ? (
             <Button onClick={handleNext}>
               Continue
             </Button>

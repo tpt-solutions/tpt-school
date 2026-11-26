@@ -45,16 +45,20 @@ export async function setupIfNeeded(page: Page): Promise<boolean> {
   const yearInput = page.locator('input[name="currentYear"], input[placeholder*="year" i], input[id*="year" i]').first()
   await yearInput.fill(TEST_SCHOOL.currentYear)
 
-  await page.getByRole('button', { name: /next/i }).click()
+  await page.getByRole('button', { name: /continue/i }).click()
 
-  // Step 2 — Admin account
+  // Step 2 — Academic year & terms (dates are pre-filled with sensible defaults)
+  await expect(page.getByRole('heading', { name: /academic year/i })).toBeVisible()
+  await page.getByRole('button', { name: /continue/i }).click()
+
+  // Step 3 — Admin account
   await page.getByLabel(/Admin Name|Full Name/i).fill(TEST_ADMIN.name)
   await page.getByLabel(/Admin Email|Email/i).fill(TEST_ADMIN.email)
   await page.getByLabel(/^Password/).fill(TEST_ADMIN.password)
   await page.getByLabel(/Confirm Password/i).fill(TEST_ADMIN.password)
-  await page.getByRole('button', { name: /next/i }).click()
+  await page.getByRole('button', { name: /continue/i }).click()
 
-  // Step 3 — Review & confirm
+  // Step 4 — Review & confirm
   await page.getByRole('button', { name: /complete setup|finish|confirm/i }).click()
   await page.waitForURL('**/dashboard', { timeout: 15_000 })
 
