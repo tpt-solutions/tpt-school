@@ -43,6 +43,22 @@ function isValidDateString(value: string): boolean {
   return !Number.isNaN(Date.parse(value))
 }
 
+/**
+ * Reads an optional date from a URL query string. Returns undefined for missing or invalid
+ * values so bad input is ignored instead of becoming an Invalid Date passed to Prisma.
+ */
+export function queryDate(value: string | undefined): Date | undefined {
+  if (!value || !isValidDateString(value.trim())) return undefined
+  return new Date(value.trim())
+}
+
+/** Reads an optional positive integer from a URL query string; undefined when missing or invalid. */
+export function queryInt(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value.trim())) return undefined
+  const n = Number(value.trim())
+  return Number.isSafeInteger(n) && n > 0 ? n : undefined
+}
+
 export const field = {
   /** Non-empty trimmed text with a maximum length. */
   required(label: string, max = 255) {

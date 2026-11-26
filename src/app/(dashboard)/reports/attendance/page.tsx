@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { queryDate, queryInt } from '@/lib/form'
 import Link from 'next/link'
 import { ChevronLeft, Download } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,9 +20,9 @@ export default async function AttendanceReportPage({
   await requireRole(['admin'])
 
   const sp = await searchParams
-  const yearLevel = sp.yearLevel ? parseInt(sp.yearLevel, 10) : undefined
-  const from = sp.from ? new Date(sp.from) : undefined
-  const to = sp.to ? new Date(sp.to) : undefined
+  const yearLevel = queryInt(sp.yearLevel)
+  const from = queryDate(sp.from)
+  const to = queryDate(sp.to)
   const studentId = sp.studentId ?? undefined
 
   // Fetch students matching filters

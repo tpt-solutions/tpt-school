@@ -142,9 +142,12 @@ export default async function BehaviourPage() {
         </CardHeader>
         <CardContent>
           {incidents.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">
-              No incidents recorded yet.
-            </p>
+            <div className="py-8 text-center text-sm text-gray-500">
+              <p>No incidents recorded yet.</p>
+              <Link href="/behaviour/new" className={buttonVariants({ size: 'sm' }) + ' mt-3'}>
+                Log the first incident
+              </Link>
+            </div>
           ) : (
             <Table>
               <TableHeader>
