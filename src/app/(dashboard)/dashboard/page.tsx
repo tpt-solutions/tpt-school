@@ -1,6 +1,7 @@
 import { requireSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { OnboardingChecklist, type OnboardingCounts } from '@/components/onboarding-checklist'
 import Link from 'next/link'
 import {
   GraduationCap,
@@ -30,6 +31,27 @@ async function getAdminStats() {
     db.feeInvoice.count({ where: { status: 'unpaid' } }),
   ])
   return { totalStudents, totalStaff, todayAttendance, outstandingFees }
+}
+
+async function getOnboardingCounts(): Promise<OnboardingCounts> {
+  const [academicYears, terms, staff, classes, students, feeTypes, settings] = await Promise.all([
+    db.academicYear.count(),
+    db.term.count(),
+    db.staff.count(),
+    db.class.count(),
+    db.student.count(),
+    db.feeType.count(),
+    db.schoolSettings.findFirst({ select: { smtpHost: true } }),
+  ])
+  return {
+    academicYears,
+    terms,
+    staff,
+    classes,
+    students,
+    feeTypes,
+    smtpConfigured: Boolean(settings?.smtpHost),
+  }
 }
 
 async function getTeacherStats(userId: string) {
@@ -201,7 +223,11 @@ export default async function DashboardPage() {
     'Good evening'
 
   if (user.role === 'admin') {
-    const [stats, atRiskStudents] = await Promise.all([getAdminStats(), getAtRiskStudents()])
+    const [stats, atRiskStudents, onboarding] = await Promise.all([
+      getAdminStats(),
+      getAtRiskStudents(),
+      getOnboardingCounts(),
+    ])
     return (
       <div className="space-y-8">
         {/* Welcome banner */}
@@ -210,6 +236,8 @@ export default async function DashboardPage() {
           <h1 className="text-2xl md:text-3xl font-bold mt-0.5">{user.name}</h1>
           <p className="text-primary-foreground/80 text-sm mt-1">{schoolName} &mdash; Administrator</p>
         </div>
+
+        <OnboardingChecklist counts={onboarding} />
 
         {/* Stats */}
         <div>

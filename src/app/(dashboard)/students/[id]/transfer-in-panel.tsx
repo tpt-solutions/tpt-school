@@ -51,7 +51,7 @@ export default function TransferInPanel({ studentId, canEdit, transferIn }: Prop
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<SuggestedClass[]>([])
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(canEdit)
   const [enrollingId, setEnrollingId] = useState<string | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
 
@@ -65,9 +65,20 @@ export default function TransferInPanel({ studentId, canEdit, transferIn }: Prop
     setLoadingSuggestions(false)
   }, [studentId, canEdit])
 
+  // Fetch on mount / when inputs change. Subscribes via promise callback (not a
+  // synchronous setState in the effect body) and ignores stale results.
   useEffect(() => {
-    loadSuggestions()
-  }, [loadSuggestions])
+    if (!canEdit) return
+    let cancelled = false
+    getSuggestedClassesAction(studentId).then(result => {
+      if (cancelled) return
+      setSuggestions(result)
+      setLoadingSuggestions(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [studentId, canEdit])
 
   async function handleEnroll(classId: string) {
     setEnrollingId(classId)

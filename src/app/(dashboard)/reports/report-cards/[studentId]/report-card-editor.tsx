@@ -86,7 +86,8 @@ export default function ReportCardEditor({
     })
   }
 
-  const AiButton = ({ field }: { field: 'comments' | 'teacherNotes' }) => (
+  // Plain render helper (not a component) so it doesn't remount on every render.
+  const renderAiButton = (field: 'comments' | 'teacherNotes') => (
     <Button
       type="button"
       size="sm"
@@ -130,7 +131,7 @@ export default function ReportCardEditor({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="comments">General Comments</Label>
-            {aiEnabled && <AiButton field="comments" />}
+            {aiEnabled && renderAiButton('comments')}
           </div>
           <Textarea
             id="comments"
@@ -144,7 +145,7 @@ export default function ReportCardEditor({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="teacherNotes">Teacher Notes</Label>
-            {aiEnabled && <AiButton field="teacherNotes" />}
+            {aiEnabled && renderAiButton('teacherNotes')}
           </div>
           <Textarea
             id="teacherNotes"
@@ -184,7 +185,7 @@ export default function ReportCardEditor({
 
         {aiEnabled && (
           <p className="text-xs text-slate-400">
-            "Generate with AI" uses the configured AI provider to draft a comment based on grades, attendance, and behaviour data for the selected term. You can edit before saving.
+            &quot;Generate with AI&quot; uses the configured AI provider to draft a comment based on grades, attendance, and behaviour data for the selected term. You can edit before saving.
           </p>
         )}
       </CardContent>
