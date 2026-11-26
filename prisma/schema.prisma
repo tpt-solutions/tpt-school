@@ -44,6 +44,9 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
 }
 
 model VerificationToken {
@@ -341,6 +344,8 @@ model ClassEnrolment {
   student    Student  @relation(fields: [studentId], references: [id])
 
   @@unique([classId, studentId])
+
+  @@index([studentId, status])
 }
 
 model Room {
@@ -403,6 +408,8 @@ model Attendance {
   term       Term     @relation(fields: [termId], references: [id])
 
   @@unique([studentId, date])
+
+  @@index([termId])
 }
 
 // ─── Gradebook & Reports ─────────────────────────────────────────────────────
@@ -438,6 +445,8 @@ model Grade {
   student     Student   @relation(fields: [studentId], references: [id])
 
   @@unique([gradebookId, studentId])
+
+  @@index([studentId])
 }
 
 model ReportCard {
@@ -510,6 +519,8 @@ model MessageRecipient {
   user      User     @relation(fields: [userId], references: [id])
 
   @@id([messageId, userId])
+
+  @@index([userId, readAt])
 }
 
 model EmailLog {
@@ -521,6 +532,8 @@ model EmailLog {
   sentAt    DateTime?
   error     String?
   createdAt DateTime  @default(now())
+
+  @@index([createdAt])
 }
 
 model AttendanceCode {
@@ -577,6 +590,9 @@ model FeeInvoice {
   student     Student          @relation(fields: [studentId], references: [id])
   items       FeeInvoiceItem[]
   payments    FeePayment[]
+
+  @@index([studentId])
+  @@index([status])
 }
 
 model FeeInvoiceItem {
@@ -599,6 +615,8 @@ model FeePayment {
   recordedBy String?
   notes      String?
   invoice    FeeInvoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
 }
 
 // ─── Student Exit & Behaviour ─────────────────────────────────────────────────
@@ -655,6 +673,8 @@ model BehaviourIncident {
 
   student      Student     @relation(fields: [studentId], references: [id])
   suspensions  Suspension[]
+
+  @@index([studentId, date])
 }
 
 model Suspension {
