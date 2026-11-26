@@ -95,6 +95,8 @@ model SchoolSettings {
   aiReportMode   String   @default("assist") // assist | auto
   // Messaging
   parentMessagingDefault Boolean  @default(true)
+  // Email guardians when their child is marked absent on the roll (off until the school opts in)
+  absenceEmailsEnabled   Boolean  @default(false)
   // Housekeeping
   lastSessionCleanup DateTime?
   createdAt      DateTime @default(now())
@@ -536,6 +538,24 @@ model EmailLog {
   @@index([createdAt])
 }
 
+// Queued outgoing email for non-urgent notices. Survives restarts; the scheduler retries failures
+// with backoff until attempts run out.
+model EmailQueueItem {
+  id        String    @id @default(cuid())
+  to        String
+  subject   String
+  html      String
+  logBody   String?
+  status    String    @default("pending") // pending | sent | failed
+  attempts  Int       @default(0)
+  lastError String?
+  runAfter  DateTime  @default(now())
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([status, runAfter])
+}
+
 model AttendanceCode {
   id          String               @id @default(cuid())
   code        String               @unique
@@ -601,8 +621,13 @@ model FeeInvoiceItem {
   feeTypeId   String?
   description String
   amountCents Int        // stored in cents
+  // Set on items created by "generate term fees": "<feeTypeId>:<termId or academicYearId>".
+  // Stops the same fee being billed twice for one period. Null for manually created items.
+  billingKey  String?
   invoice     FeeInvoice @relation(fields: [invoiceId], references: [id])
   feeType     FeeType?   @relation(fields: [feeTypeId], references: [id])
+
+  @@index([billingKey])
 }
 
 model FeePayment {
