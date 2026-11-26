@@ -64,7 +64,12 @@ That's it — your app is live. The deploy wizard works on any VPS from any prov
 docker compose up -d --build
 ```
 
-The app will be available on port `3000` with the SQLite database persisted in a Docker volume. Override `AUTH_SECRET` and `NEXTAUTH_URL` in `docker-compose.yml` for production.
+```bash
+cp .env.example .env          # set AUTH_SECRET (required) and NEXT_PUBLIC_BASE_URL
+docker compose up -d --build
+```
+
+The app will be available on port `3000`. The SQLite database lives in the `tpt-data` Docker volume (`/app/data/tpt.db`), so it survives container rebuilds. Docker's health check polls `/api/health`. See [Environment variables](#environment-variables) and [Backups](#backups).
 
 ### VPS (manual)
 
@@ -102,7 +107,7 @@ cd tpt-school
 cp .env.example .env
 nano .env
 #   - AUTH_SECRET: generate one with `openssl rand -base64 32`
-#   - NEXTAUTH_URL: set to your domain or IP, e.g. http://your-vps-ip:3000
+#   - NEXT_PUBLIC_BASE_URL: your public URL, e.g. https://school.example.com (used in email links)
 #   - DATABASE_URL: leave as file:./dev.db (it'll live inside the project dir)
 
 # 6. Install, migrate, build
@@ -128,15 +133,59 @@ After those steps the app will be running on port `3000` and will restart automa
 
 ```bash
 npm ci
-cp .env.example .env         # edit AUTH_SECRET + NEXTAUTH_URL
+cp .env.example .env         # edit AUTH_SECRET + NEXT_PUBLIC_BASE_URL
 npx prisma migrate deploy
 npm run build
 node .next/standalone/server.js
 ```
 
-### Vercel (requires PostgreSQL/MySQL)
+### Vercel / serverless: not supported
 
-SQLite won't work on Vercel's serverless functions. Swap to a hosted database like [Neon](https://neon.tech) or [PlanetScale](https://planetscale.com) and update the Prisma schema.
+This project is **SQLite-only**. Serverless platforms like Vercel have an ephemeral filesystem, so the database file would be lost between requests. Use a VPS or Docker instead. Moving to a hosted database (e.g. Postgres via [Neon](https://neon.tech)) would require changing the Prisma datasource provider, regenerating the client and re-running migrations, and is not a supported configuration today.
+
+### Guides
+
+- [Quick start](docs/quick-start.md): install and first-run setup
+- [Admin guide](docs/admin-guide.md): day-to-day administration
+- [Teacher guide](docs/teacher-guide.md): attendance, grades and behaviour
+
+### Built-in scheduler
+
+Fee reminders run automatically once a minute after boot and then every 24 hours, in-process (`src/instrumentation.ts`). No external cron is needed. Set `DISABLE_SCHEDULER=true` if you prefer to call `GET /api/cron/fee-reminders` (with `Authorization: Bearer $CRON_SECRET`) from your own scheduler.
+
+## Environment variables
+
+All variables are documented with comments in [`.env.example`](.env.example).
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `AUTH_SECRET` | Yes in production | Encrypts stored secrets (SMTP password). Generate with `openssl rand -base64 32`. Changing it makes existing encrypted values unreadable. |
+| `DATABASE_URL` | No | SQLite file, default `file:./dev.db`. Docker uses `file:/app/data/tpt.db`. |
+| `NEXT_PUBLIC_BASE_URL` | Recommended | Public site URL used in email links. |
+| `CRON_SECRET` | If using the HTTP cron endpoint | Bearer token for `/api/cron/fee-reminders`. Endpoint is disabled when unset. |
+| `DISABLE_SCHEDULER` | No | `true` turns off the built-in daily fee-reminder job. |
+| `ALLOWED_ORIGINS` | Behind a proxy | Extra origins allowed to call server actions. |
+| `TRUST_PROXY` | Behind a proxy | `true` to read the client IP from `X-Forwarded-For` (rate limiting). Only enable behind a proxy that overwrites that header. |
+| `PORT` / `HOSTNAME` | No | Bind address, default `3000` / `0.0.0.0` in Docker. |
+
+## Backups
+
+All data is in one SQLite file, so backups are a file copy taken while the app is running or stopped.
+
+```bash
+# Docker: stop the app so the file is consistent, copy it out, restart
+docker compose stop app
+docker run --rm -v tpt-school_tpt-data:/data -v "$PWD":/backup alpine \
+  cp /data/tpt.db /backup/tpt-$(date +%F).db
+docker compose start app
+
+# Bare metal / VPS (safe while running; needs the sqlite3 CLI)
+sqlite3 dev.db ".backup 'backup-$(date +%F).db'"
+```
+
+- Keep at least one copy **off the server** (another disk, object storage, or a second host).
+- Back up `.env` too: without `AUTH_SECRET` the encrypted settings cannot be decrypted.
+- Test a restore periodically by starting the app against a backup copy.
 
 ## Tech Stack
 

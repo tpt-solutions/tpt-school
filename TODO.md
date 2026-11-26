@@ -59,7 +59,7 @@
 - [x] Setup wizard: make first-admin creation atomic
 - [x] Rate limiting: stop trusting `x-forwarded-for`; add limits to attendance-code entry and reset requests
 - [x] Races: transactions for payments, enrolment capacity, waitlist position, ID generation (`count()+1`)
-- [ ] Validation: zod schemas for actions; reject invalid dates, NaN, `javascript:` URLs; enforce `score <= maxScore`; integer-cents money — _partial: zod-based checks for student/staff/leave inputs, gradebook score/URL checks, money stored as integer cents; other actions still need zod_
+- [ ] Validation: zod schemas for actions; reject invalid dates, NaN, `javascript:` URLs; enforce `score <= maxScore`; integer-cents money — _partial: shared helper `src/lib/form.ts` (calendar-checked dates, whole-number ranges, http(s)-only URLs, enums). Applied to behaviour incidents/suspensions/exits, notices, school info, academic years, terms (create and update), rooms, SMTP, fee types (incl. frequency), invoice due dates, classes, calendar events, timetable slots, attendance status and window, enrolment message length. Also covered: timetable bulk create and requirements, assignment submission links (http/https only), parent enrolment message, student and staff CSV imports (per-row server checks, 1000-row cap). Also fixed: class create/update swallowed `redirect()` inside `try` (now redirects correctly). Not yet audited: the remaining small actions in `staff/[id]` and `reports`_
 - [x] Middleware (`src/proxy.ts`): fix path prefix matching; add security headers and `serverActions.allowedOrigins`
 - [ ] Schema indexes on Session, Attendance, Grade, FeeInvoice, FeePayment, BehaviourIncident, ClassEnrolment, MessageRecipient, EmailLog; add pagination to large lists — _partial: indexes added (migration `20261126000000_add_hot_path_indexes`, verified against schema); students list paginated; other large lists still open_
 - [ ] Audit logging for logins, role changes, grade edits, payments, settings — _partial: logins, grade edits, payments, settings, student deactivation logged; no role-change code path exists to audit yet_
@@ -67,21 +67,21 @@
 - [x] Delete stale `TODO copy.md`
 
 ## Phase 9: Adoption
-- [ ] Add `.env.example`, `docker-compose.yml` (DB volume + cron), Dockerfile `HEALTHCHECK`
-- [ ] Fix README (Vercel claim is wrong — SQLite only; add backup guidance; document all env vars)
-- [ ] In-process scheduler for fee reminders (`instrumentation.ts` + node-cron)
+- [x] Add `.env.example`, `docker-compose.yml` (DB volume + cron), Dockerfile `HEALTHCHECK` — compose uses the `tpt-data` volume; cron is covered by the in-process scheduler, so no sidecar is needed
+- [x] Fix README (Vercel claim is wrong — SQLite only; add backup guidance; document all env vars)
+- [x] In-process scheduler for fee reminders (`src/instrumentation.ts`; uses `setInterval`, not node-cron, to avoid a new dependency; `DISABLE_SCHEDULER=true` turns it off)
 - [ ] Setup wizard: academic year/terms step, SMTP test, optional demo data, generated admin password (no fixed seed passwords)
-- [ ] Downloadable CSV templates + example preview on each importer; `/templates` sample files
+- [ ] Downloadable CSV templates + example preview on each importer; `/templates` sample files — _partial: `public/templates/` samples for students and staff, download links on both importers, `/templates` page with previews; previews are not inline on the importer pages_
 - [ ] School-type presets (primary/secondary, NZ/AU/UK/CA)
 - [ ] Importers for classes, enrolments, guardians, fee types, timetable
-- [ ] Admin dashboard onboarding checklist; empty states with call-to-action
-- [ ] `docs/` quick-start, admin and teacher guides
+- [ ] Admin dashboard onboarding checklist; empty states with call-to-action — _partial: checklist on admin dashboard (hidden once required steps are done); empty-state CTAs not done_
+- [x] `docs/` quick-start, admin and teacher guides
 
 ## Phase 10: Usability & Automation (roadmap)
-- [ ] `loading.tsx`, `error.tsx`, `not-found.tsx`
+- [x] `loading.tsx`, `error.tsx`, `not-found.tsx` (dashboard-group `loading.tsx`; root `error.tsx` and `not-found.tsx`)
 - [ ] Sort/filter/paginate lists; bulk actions with row checkboxes
 - [ ] Mobile card layout for wide tables; dark-mode toggle (mount `next-themes` provider)
-- [ ] Accessibility pass (skip link, table captions, focus management)
+- [ ] Accessibility pass (skip link, table captions, focus management) — _partial: skip link added to dashboard shell; captions on the `/templates` tables only_
 - [ ] Command palette (Ctrl+K)
 - [ ] Parent portal: grades, invoices, report cards
 - [ ] Same-day absence emails to guardians; email queue with retry
