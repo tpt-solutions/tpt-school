@@ -77,7 +77,7 @@ function RequestCard({ request }: { request: RequestItem }) {
               <span>{new Date(request.createdAt).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             </div>
             {request.message && (
-              <p className="text-xs text-slate-600 italic mt-1">"{request.message}"</p>
+              <p className="text-xs text-slate-600 italic mt-1">&quot;{request.message}&quot;</p>
             )}
           </div>
 

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import type { SchoolSettings } from '@/generated/prisma/client'
 import { decrypt } from '@/lib/crypto'
 import { centsToDecimalString } from '@/lib/money'
 
@@ -61,7 +62,7 @@ export async function sendEmail(
   return result
 }
 
-async function sendViaSmtp(payload: EmailPayload, settings: any) {
+async function sendViaSmtp(payload: EmailPayload, settings: SchoolSettings) {
   if (!settings.smtpHost) return { success: false, error: 'SMTP not configured.' }
   const nodemailer = await import('nodemailer')
   const smtpPass = decrypt(settings.smtpPass ?? '')
@@ -80,7 +81,7 @@ async function sendViaSmtp(payload: EmailPayload, settings: any) {
   return { success: true }
 }
 
-async function sendViaResend(payload: EmailPayload, apiKey: string, settings: any) {
+async function sendViaResend(payload: EmailPayload, apiKey: string, settings: SchoolSettings) {
   if (!apiKey) return { success: false, error: 'Resend API key not configured.' }
   const fromAddress = settings.smtpFrom ?? `noreply@${settings.email?.split('@')[1] ?? 'school.com'}`
   const res = await fetch('https://api.resend.com/emails', {
@@ -95,7 +96,7 @@ async function sendViaResend(payload: EmailPayload, apiKey: string, settings: an
   return { success: true }
 }
 
-async function sendViaMailjet(payload: EmailPayload, apiKey: string, secret: string, settings: any) {
+async function sendViaMailjet(payload: EmailPayload, apiKey: string, secret: string, settings: SchoolSettings) {
   if (!apiKey || !secret) return { success: false, error: 'Mailjet credentials not configured.' }
   const fromAddress = settings.smtpFrom ?? `noreply@school.com`
   const fromName = settings.name ?? 'School'
@@ -123,7 +124,7 @@ async function sendViaMailjet(payload: EmailPayload, apiKey: string, secret: str
   return { success: true }
 }
 
-async function sendViaSendGrid(payload: EmailPayload, apiKey: string, settings: any) {
+async function sendViaSendGrid(payload: EmailPayload, apiKey: string, settings: SchoolSettings) {
   if (!apiKey) return { success: false, error: 'SendGrid API key not configured.' }
   const fromAddress = settings.smtpFrom ?? `noreply@school.com`
   const body = {

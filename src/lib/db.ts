@@ -12,7 +12,7 @@ function createClient(): PrismaClient {
     : path.join(process.cwd(), dbPath)
 
   const adapter = new PrismaBetterSqlite3({ url: resolvedPath })
-  return new (PrismaClient as any)({ adapter }) as PrismaClient
+  return new PrismaClient({ adapter })
 }
 
 export const db: PrismaClient =

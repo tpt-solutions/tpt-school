@@ -365,7 +365,7 @@ export default function ScheduleGenerator({ requirements: initialRequirements, c
       )}
 
       {proposedSlots && proposedSlots.length === 0 && (
-        <p className="text-sm text-muted-foreground">No slots could be generated. Check that your requirements don't have too many conflicts.</p>
+        <p className="text-sm text-muted-foreground">No slots could be generated. Check that your requirements don&apos;t have too many conflicts.</p>
       )}
 
       {/* Apply result */}

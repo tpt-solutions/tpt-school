@@ -117,7 +117,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     generatedAt: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
   })
 
-  const buffer = await renderToBuffer(docElement as any)
+  const buffer = await renderToBuffer(docElement as unknown as Parameters<typeof renderToBuffer>[0])
 
   const safeName = student.user.name.replace(/[^a-z0-9]/gi, '_')
   return new NextResponse(new Uint8Array(buffer), {

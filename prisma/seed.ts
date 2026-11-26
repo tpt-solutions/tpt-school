@@ -16,7 +16,7 @@ function createDb(): PrismaClient {
   const dbPath = dbUrl.replace(/^file:/, '')
   const resolvedPath = path.isAbsolute(dbPath) ? dbPath : path.join(process.cwd(), dbPath)
   const adapter = new PrismaBetterSqlite3({ url: resolvedPath })
-  return new (PrismaClient as any)({ adapter }) as PrismaClient
+  return new PrismaClient({ adapter })
 }
 
 async function main() {
