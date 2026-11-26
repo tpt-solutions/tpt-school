@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { requireSession, requireRole } from '@/lib/auth'
+import { canMessage } from '@/lib/access'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -9,10 +10,8 @@ import { redirect } from 'next/navigation'
 
 export async function createNoticeAction(formData: FormData): Promise<{ success: boolean; error?: string }> {
   try {
-    const user = await requireSession()
-    if (!['admin', 'teacher'].includes(user.role)) {
-      return { success: false, error: 'Unauthorised.' }
-    }
+    // School-wide notices are published by admins only
+    const user = await requireRole(['admin'])
 
     const title = (formData.get('title') as string)?.trim()
     const body = (formData.get('body') as string)?.trim()
@@ -76,6 +75,9 @@ export async function sendMessageAction(
 
     const recipient = await db.user.findUnique({ where: { id: recipientId } })
     if (!recipient) return { success: false, error: 'Recipient not found.' }
+    if (!(await canMessage(user, recipientId))) {
+      return { success: false, error: 'You are not allowed to message this person.' }
+    }
 
     // Create root message — threadId must equal message.id, so we do a two-step write
     const message = await db.message.create({
@@ -160,6 +162,9 @@ export async function sendReplyAction(
         : root.senderId
 
     if (!recipientId) return { success: false, error: 'Cannot determine reply recipient.' }
+    if (!(await canMessage(user, recipientId))) {
+      return { success: false, error: 'You are not allowed to message this person.' }
+    }
 
     await db.message.create({
       data: {

@@ -36,15 +36,35 @@ async function getTeacherStats(userId: string) {
   const staff = await db.staff.findUnique({ where: { userId } })
   if (!staff) return { myClasses: 0, myStudents: 0, todayAttendance: 0, pendingGrades: 0 }
 
-  const [myClasses, pendingGrades] = await Promise.all([
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfTomorrow = new Date(startOfToday)
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1)
+
+  const [myClasses, pendingGrades, enrolments] = await Promise.all([
     db.classTeacher.count({ where: { staffId: staff.id } }),
     db.grade.count({ where: { gradedAt: null, gradebook: { class: { teachers: { some: { staffId: staff.id } } } } } }),
+    db.classEnrolment.findMany({
+      where: { status: 'active', class: { teachers: { some: { staffId: staff.id } } } },
+      select: { studentId: true },
+    }),
   ])
+
+  const myStudentIds = [...new Set(enrolments.map(e => e.studentId))]
+  const todayPresent = myStudentIds.length === 0
+    ? 0
+    : await db.attendance.count({
+        where: {
+          studentId: { in: myStudentIds },
+          status: 'present',
+          date: { gte: startOfToday, lt: startOfTomorrow },
+        },
+      })
 
   return {
     myClasses,
-    myStudents: 0, // placeholder
-    todayAttendance: 0, // placeholder
+    myStudents: myStudentIds.length,
+    todayAttendance: todayPresent,
     pendingGrades,
   }
 }

@@ -1,10 +1,11 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { requireRole, requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+import { canAccessStudent } from "@/lib/access";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { sendEmail, truancyEmailHtml, behaviourEmailHtml } from "@/lib/email";
+import { sendEmail, behaviourEmailHtml } from "@/lib/email";
 
 export async function createIncidentAction(formData: FormData) {
   const session = await requireRole(["admin", "teacher"]);
@@ -180,66 +181,22 @@ export async function exitStudentAction(formData: FormData) {
   }
 }
 
-export async function checkTruancyAction(studentId: string, termId: string) {
-  const recentAttendance = await db.attendance.findMany({
-    where: { studentId, termId },
-    orderBy: { date: "desc" },
-    take: 30,
-  });
-
-  // Count consecutive unexcused absences from most recent
-  let consecutive = 0;
-  for (const record of recentAttendance) {
-    if (record.status === "absent") {
-      consecutive++;
-    } else {
-      break;
-    }
-  }
-
-  const totalUnexcused = recentAttendance.filter(
-    (r: { status: string }) => r.status === "absent"
-  ).length;
-
-  // Threshold: 3+ consecutive or 10+ total unexcused in term
-  if (consecutive >= 3 || totalUnexcused >= 10) {
-    const existing = await db.truancyAlert.findFirst({
-      where: { studentId, termId, resolvedAt: null },
-    });
-    if (!existing) {
-      await db.truancyAlert.create({
-        data: { studentId, termId, consecutiveAbsences: consecutive, totalUnexcused },
-      });
-
-      // Fire-and-forget email to parents
-      db.student.findUnique({
-        where: { id: studentId },
-        include: {
-          user: { select: { name: true } },
-          parents: { include: { parent: { include: { user: { select: { name: true, email: true } } } } } },
-        },
-      }).then(student => {
-        if (!student) return
-        const primaryParent = student.parents.find(sp => sp.isPrimary)?.parent ?? student.parents[0]?.parent
-        if (!primaryParent?.user?.email) return
-        db.schoolSettings.findFirst().then(settings => {
-          const schoolName = settings?.name ?? 'School'
-          sendEmail({
-            to: primaryParent.user!.email,
-            subject: `Attendance alert — ${student.user.name}`,
-            html: truancyEmailHtml(primaryParent.user!.name, student.user.name, consecutive, totalUnexcused, schoolName),
-          }).catch(() => {})
-        }).catch(() => {})
-      }).catch(() => {})
-    }
-  }
-}
-
 export async function resolveTruancyAlertAction(alertId: string, notes: string) {
-  const session = await requireSession();
+  const session = await requireRole(["admin", "teacher"]);
+
+  const alert = await db.truancyAlert.findUnique({
+    where: { id: alertId },
+    select: { studentId: true, resolvedAt: true },
+  });
+  if (!alert) return { success: false, error: "Alert not found." };
+  if (!(await canAccessStudent(session, alert.studentId))) {
+    return { success: false, error: "You are not authorised to resolve this alert." };
+  }
+  if (alert.resolvedAt) return { success: false, error: "Alert is already resolved." };
+
   await db.truancyAlert.update({
     where: { id: alertId },
-    data: { resolvedAt: new Date(), resolvedBy: session.id, notes },
+    data: { resolvedAt: new Date(), resolvedBy: session.id, notes: notes?.trim() || null },
   });
   revalidatePath("/behaviour");
   return { success: true };

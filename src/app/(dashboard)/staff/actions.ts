@@ -2,7 +2,7 @@
 
 import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
-import { hashPassword } from '@/lib/auth'
+import { hashPassword, requireRole, requireSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { sendEmail, leaveDecisionEmailHtml } from '@/lib/email'
@@ -21,6 +21,8 @@ function generateTempPassword(): string {
 // ─── Create Staff ─────────────────────────────────────────────────────────────
 
 export async function createStaffAction(formData: FormData): Promise<{ success: boolean; error?: string; id?: string; tempPassword?: string }> {
+  await requireRole(['admin'])
+
   try {
     const firstName = (formData.get('firstName') as string)?.trim()
     const lastName = (formData.get('lastName') as string)?.trim()
@@ -83,6 +85,8 @@ export async function createStaffAction(formData: FormData): Promise<{ success: 
 // ─── Update Staff ─────────────────────────────────────────────────────────────
 
 export async function updateStaffAction(id: string, formData: FormData): Promise<{ success: boolean; error?: string }> {
+  await requireRole(['admin'])
+
   try {
     const staff = await db.staff.findUnique({ where: { id }, include: { user: true } })
     if (!staff) return { success: false, error: 'Staff member not found.' }
@@ -144,7 +148,16 @@ export async function createLeaveRequestAction(
   staffId: string,
   formData: FormData,
 ): Promise<{ success: boolean; error?: string }> {
+  // Only admins, or the staff member themself, may request leave
+  const session = await requireSession()
+
   try {
+    const staffRecord = await db.staff.findUnique({ where: { id: staffId }, select: { userId: true } })
+    if (!staffRecord) return { success: false, error: 'Staff member not found.' }
+    if (session.role !== 'admin' && staffRecord.userId !== session.id) {
+      return { success: false, error: 'You are not authorised to request leave for this staff member.' }
+    }
+
     const type = (formData.get('type') as string)?.trim()
     const startDateRaw = formData.get('startDate') as string
     const endDateRaw = formData.get('endDate') as string
@@ -182,16 +195,22 @@ export async function createLeaveRequestAction(
 
 export async function updateLeaveStatusAction(
   leaveId: string,
-  status: string,
-  approvedBy: string,
+  status: 'approved' | 'declined',
 ): Promise<{ success: boolean; error?: string }> {
+  // approver is always the signed-in admin; never trust a client-supplied name
+  const session = await requireRole(['admin'])
+
+  if (status !== 'approved' && status !== 'declined') {
+    return { success: false, error: 'Invalid leave status.' }
+  }
+
   try {
     const leave = await db.leaveRequest.findUnique({ where: { id: leaveId } })
     if (!leave) return { success: false, error: 'Leave request not found.' }
 
     await db.leaveRequest.update({
       where: { id: leaveId },
-      data: { status, approvedBy },
+      data: { status, approvedBy: session.name },
     })
 
     // Fire-and-forget notification to staff member

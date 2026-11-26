@@ -47,7 +47,7 @@ function daysBetween(start: Date, end: Date): number {
 }
 
 export default async function StaffDetailPage({ params }: { params: Params }) {
-  const session = await requireRole(['admin'])
+  await requireRole(['admin'])
   const { id } = await params
 
   const staff = await db.staff.findUnique({
@@ -291,8 +291,8 @@ export default async function StaffDetailPage({ params }: { params: Params }) {
                             {/* Admin approve/decline buttons for pending requests */}
                             {leave.status === 'pending' && (
                               <div className="flex items-center gap-2 shrink-0">
-                                <LeaveApproveButton leaveId={leave.id} approverName={session.name} />
-                                <LeaveDeclineButton leaveId={leave.id} approverName={session.name} />
+                                <LeaveApproveButton leaveId={leave.id} />
+                                <LeaveDeclineButton leaveId={leave.id} />
                               </div>
                             )}
                           </div>

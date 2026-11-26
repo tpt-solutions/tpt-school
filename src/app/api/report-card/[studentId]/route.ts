@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { canAccessStudent } from '@/lib/access'
 import { db } from '@/lib/db'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
   const { studentId } = await params
   const termId = req.nextUrl.searchParams.get('termId') ?? undefined
+
+  if (!(await canAccessStudent(session, studentId))) {
+    return new NextResponse('Forbidden', { status: 403 })
+  }
 
   const [student, school] = await Promise.all([
     db.student.findUnique({

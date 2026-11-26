@@ -1,9 +1,11 @@
 'use server'
 
+import { randomInt } from 'node:crypto'
 import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
-import { checkTruancyAction } from '@/app/(dashboard)/behaviour/actions'
+import { teachesClass } from '@/lib/access'
+import { checkTruancy } from '@/lib/truancy'
 
 export interface AttendanceRecord {
   studentId: string
@@ -16,6 +18,21 @@ export async function saveAttendanceAction(
   records: AttendanceRecord[]
 ) {
   const session = await requireRole(['admin', 'teacher'])
+
+  if (!(await teachesClass(session, classId))) {
+    return { error: 'You are not a teacher of this class' }
+  }
+
+  // Every student in the roll must be actively enrolled in this class
+  const enrolled = new Set(
+    (await db.classEnrolment.findMany({
+      where: { classId, status: 'active' },
+      select: { studentId: true },
+    })).map(e => e.studentId)
+  )
+  if (records.some(r => !enrolled.has(r.studentId))) {
+    return { error: 'One or more students are not enrolled in this class' }
+  }
 
   // Find the current term
   const today = new Date()
@@ -61,7 +78,7 @@ export async function saveAttendanceAction(
     // Run truancy checks for all students in the roll (fire-and-forget, don't block save)
     const absentStudents = records.filter(r => r.status === 'absent').map(r => r.studentId)
     if (absentStudents.length > 0) {
-      await Promise.all(absentStudents.map(sid => checkTruancyAction(sid, term.id)))
+      await Promise.all(absentStudents.map(sid => checkTruancy(sid, term.id)))
     }
 
     revalidatePath(`/attendance/roll/${classId}`)
@@ -81,7 +98,12 @@ export async function generateAttendanceCodeAction(
 ) {
   const session = await requireRole(['admin', 'teacher'])
 
-  const code = Math.floor(Math.random() * 1000000).toString().padStart(6, '0')
+  if (!(await teachesClass(session, classId))) {
+    return { error: 'You are not a teacher of this class' }
+  }
+
+  // crypto-grade randomness: this code gates attendance self-check-in
+  const code = randomInt(0, 1000000).toString().padStart(6, '0')
   const now = new Date()
   const date = new Date(now)
   date.setHours(0, 0, 0, 0)

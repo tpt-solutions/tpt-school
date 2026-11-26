@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
+import { isCodeEntryAllowed, recordCodeFailure } from '@/lib/rate-limit'
 
 export async function submitAttendanceCodeAction(code: string): Promise<{ success?: true; error?: string }> {
   const session = await requireRole(['student'])
@@ -11,6 +12,11 @@ export async function submitAttendanceCodeAction(code: string): Promise<{ succes
   })
   if (!student) return { error: 'Student record not found' }
 
+  const limiterKey = `student:${student.id}`
+  if (!isCodeEntryAllowed(limiterKey)) {
+    return { error: 'Too many incorrect codes. Please wait a few minutes and try again.' }
+  }
+
   const now = new Date()
 
   try {
@@ -19,7 +25,10 @@ export async function submitAttendanceCodeAction(code: string): Promise<{ succes
         where: { code },
       })
 
-      if (!attendanceCode) return { error: 'Invalid code' }
+      if (!attendanceCode) {
+        recordCodeFailure(limiterKey)
+        return { error: 'Invalid code' }
+      }
       if (attendanceCode.expiresAt < now) return { error: 'This code has expired' }
 
       const existing = await tx.attendanceCodeUsage.findUnique({

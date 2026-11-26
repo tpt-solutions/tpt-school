@@ -20,6 +20,7 @@ export default function CodePanel({ classId, termId }: CodePanelProps) {
     setGenerating(true)
     try {
       const result = await generateAttendanceCodeAction(classId, termId)
+      if ('error' in result) return
       setCode(result.code)
       setExpiresAt(new Date(result.expiresAt))
     } finally {

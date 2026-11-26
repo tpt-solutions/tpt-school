@@ -7,10 +7,9 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 type Props = {
   leaveId: string
-  approverName: string
 }
 
-export function LeaveApproveButton({ leaveId, approverName }: Props) {
+export function LeaveApproveButton({ leaveId }: Props) {
   const [isPending, startTransition] = useTransition()
   const [done, setDone] = useState(false)
 
@@ -30,7 +29,7 @@ export function LeaveApproveButton({ leaveId, approverName }: Props) {
       disabled={isPending}
       onClick={() => {
         startTransition(async () => {
-          const result = await updateLeaveStatusAction(leaveId, 'approved', approverName)
+          const result = await updateLeaveStatusAction(leaveId, 'approved')
           if (result.success) setDone(true)
         })
       }}
@@ -41,7 +40,7 @@ export function LeaveApproveButton({ leaveId, approverName }: Props) {
   )
 }
 
-export function LeaveDeclineButton({ leaveId, approverName }: Props) {
+export function LeaveDeclineButton({ leaveId }: Props) {
   const [isPending, startTransition] = useTransition()
   const [done, setDone] = useState(false)
 
@@ -61,7 +60,7 @@ export function LeaveDeclineButton({ leaveId, approverName }: Props) {
       disabled={isPending}
       onClick={() => {
         startTransition(async () => {
-          const result = await updateLeaveStatusAction(leaveId, 'declined', approverName)
+          const result = await updateLeaveStatusAction(leaveId, 'declined')
           if (result.success) setDone(true)
         })
       }}

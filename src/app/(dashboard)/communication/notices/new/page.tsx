@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
 export default async function NewNoticePage() {
-  await requireRole(['admin', 'teacher'])
+  await requireRole(['admin'])
 
   return (
     <div className="space-y-6">

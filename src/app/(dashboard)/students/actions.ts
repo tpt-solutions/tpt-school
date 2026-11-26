@@ -20,6 +20,8 @@ function generateTempPassword(): string {
 // ─── Create ──────────────────────────────────────────────────────────────────
 
 export async function createStudentAction(formData: FormData): Promise<{ success: boolean; error?: string; id?: string; tempPassword?: string }> {
+  await requireRole(['admin'])
+
   try {
     const firstName = (formData.get('firstName') as string)?.trim()
     const lastName = (formData.get('lastName') as string)?.trim()
@@ -100,6 +102,8 @@ export async function createStudentAction(formData: FormData): Promise<{ success
 // ─── Update ──────────────────────────────────────────────────────────────────
 
 export async function updateStudentAction(id: string, formData: FormData): Promise<{ success: boolean; error?: string }> {
+  await requireRole(['admin'])
+
   try {
     const student = await db.student.findUnique({ where: { id }, include: { user: true } })
     if (!student) return { success: false, error: 'Student not found.' }
@@ -177,6 +181,8 @@ export async function updateStudentAction(id: string, formData: FormData): Promi
 // ─── Delete (soft) ───────────────────────────────────────────────────────────
 
 export async function deleteStudentAction(id: string): Promise<{ success: boolean; error?: string }> {
+  await requireRole(['admin'])
+
   try {
     const student = await db.student.findUnique({ where: { id } })
     if (!student) return { success: false, error: 'Student not found.' }
@@ -296,6 +302,8 @@ export async function searchStudentsAction(
   yearLevel?: string,
   status?: string,
 ) {
+  await requireRole(['admin', 'teacher'])
+
   const students = await db.student.findMany({
     where: {
       AND: [
@@ -311,7 +319,8 @@ export async function searchStudentsAction(
         status ? { enrollmentStatus: status } : {},
       ],
     },
-    include: { user: true },
+    // Never return the user row wholesale: it includes passwordHash and session data
+    include: { user: { select: { id: true, name: true, email: true, phone: true, active: true, avatar: true } } },
     orderBy: { enrollmentDate: 'desc' },
   })
   return students
