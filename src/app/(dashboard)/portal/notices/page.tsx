@@ -1,5 +1,7 @@
 import { requireSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { pageWindow } from '@/lib/pagination'
+import { Pager } from '@/components/ops/pager'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Bell, Pin, ChevronLeft } from 'lucide-react'
@@ -12,24 +14,36 @@ const CATEGORY_COLORS: Record<string, string> = {
   academic: 'bg-violet-100 text-violet-700',
 }
 
-export default async function PortalNoticesPage() {
+const PAGE_SIZE = 20
+
+type SearchParams = Promise<{ page?: string }>
+
+export default async function PortalNoticesPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireSession()
+  const { page: pageParam } = await searchParams
 
   const now = new Date()
 
   // Filter notices to user's role
+  const where = {
+    AND: [
+      { OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
+      { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
+      ...(user.role !== 'admin' && user.role !== 'teacher'
+        ? [{ OR: [{ targetRoles: 'all' }, { targetRoles: { contains: user.role } }] }]
+        : []),
+    ],
+  }
+
+  const total = await db.notice.count({ where })
+  const { page, pageCount, skip, take } = pageWindow(pageParam, total, PAGE_SIZE)
+
   const notices = await db.notice.findMany({
-    where: {
-      AND: [
-        { OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
-        { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
-        ...(user.role !== 'admin' && user.role !== 'teacher'
-          ? [{ OR: [{ targetRoles: 'all' }, { targetRoles: { contains: user.role } }] }]
-          : []),
-      ],
-    },
+    where,
     include: { author: { select: { name: true } } },
     orderBy: [{ pinned: 'desc' }, { publishedAt: 'desc' }],
+    skip,
+    take,
   })
 
   return (
@@ -44,7 +58,7 @@ export default async function PortalNoticesPage() {
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">School Notices</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          {notices.length} notice{notices.length !== 1 ? 's' : ''} for you
+          {total} notice{total !== 1 ? 's' : ''} for you
         </p>
       </div>
 
@@ -88,6 +102,12 @@ export default async function PortalNoticesPage() {
               </Card>
             </Link>
           ))}
+          <Pager
+            page={page}
+            pageCount={pageCount}
+            total={total}
+            hrefFor={(target) => (target > 1 ? `/portal/notices?page=${target}` : '/portal/notices')}
+          />
         </div>
       )}
     </div>

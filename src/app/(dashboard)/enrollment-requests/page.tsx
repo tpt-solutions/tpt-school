@@ -1,9 +1,19 @@
 import { requireRole } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { pageWindow } from '@/lib/pagination'
+import { Pager } from '@/components/ops/pager'
 import EnrolmentRequestsList from './enrolment-requests-list'
 
-export default async function EnrolmentRequestsPage() {
+const PAGE_SIZE = 50
+
+type SearchParams = Promise<{ page?: string }>
+
+export default async function EnrolmentRequestsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireRole(['admin'])
+  const { page: pageParam } = await searchParams
+
+  const total = await db.enrolmentRequest.count({ where: { status: 'pending' } })
+  const { page, pageCount, skip, take } = pageWindow(pageParam, total, PAGE_SIZE)
 
   const requests = await db.enrolmentRequest.findMany({
     where: { status: 'pending' },
@@ -13,6 +23,8 @@ export default async function EnrolmentRequestsPage() {
       requestedBy: { select: { name: true, email: true, role: true } },
     },
     orderBy: { createdAt: 'asc' },
+    skip,
+    take,
   })
 
   return (
@@ -32,6 +44,13 @@ export default async function EnrolmentRequestsPage() {
         student: { name: r.student.user.name, email: r.student.user.email },
         requestedBy: { name: r.requestedBy.name, role: r.requestedBy.role },
       }))} />
+
+      <Pager
+        page={page}
+        pageCount={pageCount}
+        total={total}
+        hrefFor={(target) => (target > 1 ? `/enrollment-requests?page=${target}` : '/enrollment-requests')}
+      />
     </div>
   )
 }
