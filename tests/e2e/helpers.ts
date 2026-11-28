@@ -48,7 +48,8 @@ export async function setupIfNeeded(page: Page): Promise<boolean> {
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 2 — Academic year & terms (dates are pre-filled with sensible defaults)
-  await expect(page.getByRole('heading', { name: /academic year/i })).toBeVisible()
+  // The wizard step title is a card title, not a heading element
+  await expect(page.getByText(/Academic Year & Terms|Academic Year &amp; Terms/).first()).toBeVisible()
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 3 — Admin account
@@ -60,7 +61,9 @@ export async function setupIfNeeded(page: Page): Promise<boolean> {
 
   // Step 4 — Review & confirm
   await page.getByRole('button', { name: /complete setup|finish|confirm/i }).click()
-  await page.waitForURL('**/dashboard', { timeout: 15_000 })
+  // The wizard ends on the login page; sign in as the new admin
+  await page.waitForURL(/\/(dashboard|login)/, { timeout: 15_000 })
+  if (!page.url().includes('/dashboard')) await loginAsAdmin(page)
 
   return true
 }

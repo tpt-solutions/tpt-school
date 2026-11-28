@@ -11,11 +11,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const user = await requireSession()
-
-  // Ensure setup is complete
+  // Check setup before the session: on a fresh install there is no login yet, so
+  // visitors should reach the setup wizard rather than the login page
   const settings = await db.schoolSettings.findFirst()
   if (!settings?.setupComplete) redirect('/setup')
+
+  const user = await requireSession()
 
   const schoolName = settings.name
 

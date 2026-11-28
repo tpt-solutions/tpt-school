@@ -1,10 +1,15 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
+import { db } from '@/lib/db'
 import LoginForm from './login-form'
 
 export const metadata = { title: 'Sign In — TPT School' }
 
 export default async function LoginPage() {
+  // A fresh install has no admin to sign in as, so send visitors to the setup wizard
+  const settings = await db.schoolSettings.findFirst({ select: { setupComplete: true } })
+  if (!settings?.setupComplete) redirect('/setup')
+
   const session = await getSession()
   if (session) redirect('/dashboard')
 

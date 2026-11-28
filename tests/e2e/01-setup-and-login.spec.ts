@@ -30,14 +30,15 @@ test.describe('Setup wizard + login', () => {
 
   test('logs in as admin and sees dashboard', async ({ page }) => {
     await loginAsAdmin(page)
-    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible()
+    // The dashboard heading shows the signed-in user's name
+    await expect(page.getByRole('heading', { name: TEST_ADMIN.name })).toBeVisible()
   })
 
   test('signs out', async ({ page }) => {
     await loginAsAdmin(page)
-    // Find and click sign-out (button or menu item)
-    const signOut = page.getByRole('button', { name: /sign out|log out/i })
-    await signOut.click()
+    // Sign out lives in the account menu
+    await page.getByRole('button', { name: new RegExp(TEST_ADMIN.name) }).click()
+    await page.getByRole('menuitem', { name: /sign out/i }).click()
     await page.waitForURL(/\/login/, { timeout: 5_000 })
     await expect(page).toHaveURL(/\/login/)
   })
