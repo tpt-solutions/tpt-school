@@ -16,18 +16,28 @@ import { Plus, BookOpen, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 const PAGE_SIZE = 50
 
 interface PageProps {
-  searchParams: Promise<{ yearLevel?: string; page?: string }>
+  searchParams: Promise<{ yearLevel?: string; page?: string; sort?: string; dir?: string }>
 }
 
 export default async function ClassesPage({ searchParams }: PageProps) {
   const user = await requireRole(['admin', 'teacher'])
-  const { yearLevel, page: pageParam = '1' } = await searchParams
+  const { yearLevel, page: pageParam = '1', sort: sortParam, dir: dirParam } = await searchParams
+
+  // A year level must be a whole number; anything else is ignored rather than sent to the database
+  const yearLevelNum = /^\d{1,2}$/.test(yearLevel ?? '') ? Number(yearLevel) : undefined
+  const yearLevelParam = yearLevelNum !== undefined ? String(yearLevelNum) : ''
+  const sort = sortParam === 'code' || sortParam === 'name' ? sortParam : 'yearLevel'
+  const dir: 'asc' | 'desc' = dirParam === 'desc' ? 'desc' : 'asc'
+  const orderBy =
+    sort === 'code' ? [{ code: dir }, { id: 'asc' as const }] :
+    sort === 'name' ? [{ name: dir }, { id: 'asc' as const }] :
+    [{ yearLevel: dir }, { name: 'asc' as const }, { id: 'asc' as const }]
 
   const activeYear = await db.academicYear.findFirst({ where: { active: true } })
 
   const where = {
     academicYearId: activeYear?.id,
-    ...(yearLevel ? { yearLevel: Number(yearLevel) } : {}),
+    ...(yearLevelNum !== undefined ? { yearLevel: yearLevelNum } : {}),
   }
 
   const total = await db.class.count({ where })
@@ -47,16 +57,28 @@ export default async function ClassesPage({ searchParams }: PageProps) {
       },
       _count: { select: { enrolments: { where: { status: 'active' } } } },
     },
-    orderBy: [{ yearLevel: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+    orderBy,
   })
 
-  const pageHref = (target: number) => {
+  const listParams = (overrides: Record<string, string | undefined>) => {
     const params = new URLSearchParams()
-    if (yearLevel) params.set('yearLevel', yearLevel)
-    if (target > 1) params.set('page', String(target))
+    const values: Record<string, string | undefined> = {
+      yearLevel: yearLevelParam || undefined,
+      sort: sort === 'yearLevel' ? undefined : sort,
+      dir: dir === 'asc' ? undefined : dir,
+      ...overrides,
+    }
+    for (const [k, v] of Object.entries(values)) if (v) params.set(k, v)
     const qs = params.toString()
     return qs ? `/classes?${qs}` : '/classes'
   }
+  const pageHref = (target: number) => listParams({ page: target > 1 ? String(target) : undefined })
+  // Clicking the active column flips its direction; another column sorts ascending
+  const sortHref = (column: 'code' | 'name' | 'yearLevel') => {
+    const nextDir = column === sort && dir === 'asc' ? 'desc' : 'asc'
+    return listParams({ sort: column, dir: nextDir, page: undefined })
+  }
+  const sortIndicator = (column: 'code' | 'name' | 'yearLevel') => (sort === column ? (dir === 'asc' ? ' ↑' : ' ↓') : '')
 
   const yearLevels = Array.from({ length: 13 }, (_, i) => i + 1)
 
@@ -107,10 +129,10 @@ export default async function ClassesPage({ searchParams }: PageProps) {
           <caption className="sr-only">Classes</caption>
           <TableHeader>
             <TableRow className="bg-slate-50">
-              <TableHead>Code</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead><Link href={sortHref('code')} className="hover:underline">Code{sortIndicator('code')}</Link></TableHead>
+              <TableHead><Link href={sortHref('name')} className="hover:underline">Name{sortIndicator('name')}</Link></TableHead>
               <TableHead>Subject</TableHead>
-              <TableHead>Year Level</TableHead>
+              <TableHead><Link href={sortHref('yearLevel')} className="hover:underline">Year Level{sortIndicator('yearLevel')}</Link></TableHead>
               <TableHead>Teacher</TableHead>
               <TableHead>Room</TableHead>
               <TableHead className="text-center">Students</TableHead>

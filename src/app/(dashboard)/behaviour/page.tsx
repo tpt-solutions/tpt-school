@@ -21,14 +21,34 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: "bg-red-700 text-white",
 };
 
-export default async function BehaviourPage() {
+const INCIDENT_PAGE_SIZE = 50;
+
+export default async function BehaviourPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; severity?: string }>;
+}) {
   await requireRole(["admin", "teacher"]);
+  const { page: pageParam = "1", severity: severityParam } = await searchParams;
+
+  // Only known severities reach the query
+  const SEVERITIES = ["minor", "moderate", "major", "critical"];
+  const severity = SEVERITIES.includes(severityParam ?? "") ? severityParam! : undefined;
+  const incidentWhere = severity ? { severity } : {};
+  const pageHref = (target: number) => (target > 1 ? (severity ? `/behaviour?severity=${severity}&page=${target}` : `/behaviour?page=${target}`) : (severity ? `/behaviour?severity=${severity}` : "/behaviour"));
+
+  const incidentTotal = await db.behaviourIncident.count({ where: incidentWhere });
+  const pageCount = Math.max(1, Math.ceil(incidentTotal / INCIDENT_PAGE_SIZE));
+  const requestedPage = parseInt(pageParam, 10);
+  const page = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), pageCount) : 1;
 
   const [incidents, suspensions, truancyAlerts] = await Promise.all([
     db.behaviourIncident.findMany({
+      where: incidentWhere,
       include: { student: { include: { user: true } } },
-      orderBy: { date: "desc" },
-      take: 50,
+      orderBy: [{ date: "desc" }, { id: "asc" }],
+      skip: (page - 1) * INCIDENT_PAGE_SIZE,
+      take: INCIDENT_PAGE_SIZE,
     }),
     db.suspension.findMany({
       where: { returnDate: null },
@@ -141,6 +161,18 @@ export default async function BehaviourPage() {
           <CardTitle>Recent Incidents</CardTitle>
         </CardHeader>
         <CardContent>
+          <nav aria-label="Filter incidents by severity" className="mb-4 flex flex-wrap gap-2 text-sm">
+            {[undefined, ...SEVERITIES].map((level) => (
+              <Link
+                key={level ?? "all"}
+                href={level ? `/behaviour?severity=${level}` : "/behaviour"}
+                aria-current={(severity ?? undefined) === level ? "page" : undefined}
+                className={buttonVariants({ variant: (severity ?? undefined) === level ? "default" : "outline", size: "sm" }) + " capitalize"}
+              >
+                {level ?? "All"}
+              </Link>
+            ))}
+          </nav>
           {incidents.length === 0 ? (
             <div className="py-8 text-center text-sm text-gray-500">
               <p>No incidents recorded yet.</p>
@@ -149,6 +181,7 @@ export default async function BehaviourPage() {
               </Link>
             </div>
           ) : (
+            <>
             <Table className="table-stack">
               <caption className="sr-only">Behaviour incidents</caption>
               <TableHeader>
@@ -199,6 +232,28 @@ export default async function BehaviourPage() {
                 ))}
               </TableBody>
             </Table>
+            {pageCount > 1 && (
+              <nav aria-label="Incident pages" className="mt-4 flex items-center justify-between text-sm text-gray-600">
+                <span>Page {page} of {pageCount}</span>
+                <div className="flex gap-2">
+                  <Link
+                    href={pageHref(page - 1)}
+                    aria-disabled={page <= 1}
+                    className={buttonVariants({ variant: "outline", size: "sm" }) + (page <= 1 ? " pointer-events-none opacity-50" : "")}
+                  >
+                    Previous
+                  </Link>
+                  <Link
+                    href={pageHref(page + 1)}
+                    aria-disabled={page >= pageCount}
+                    className={buttonVariants({ variant: "outline", size: "sm" }) + (page >= pageCount ? " pointer-events-none opacity-50" : "")}
+                  >
+                    Next
+                  </Link>
+                </div>
+              </nav>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

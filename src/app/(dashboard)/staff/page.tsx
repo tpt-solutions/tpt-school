@@ -14,7 +14,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { UserPlus, Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
-type SearchParams = Promise<{ q?: string; page?: string }>
+type SearchParams = Promise<{ q?: string; page?: string; status?: string; sort?: string; dir?: string }>
+
+const SORT_COLUMNS = ['name', 'employeeId'] as const
+type StaffSort = typeof SORT_COLUMNS[number]
 
 const PAGE_SIZE = 50
 
@@ -27,16 +30,29 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
 export default async function StaffPage({ searchParams }: { searchParams: SearchParams }) {
   await requireRole(['admin'])
 
-  const { q = '', page: pageParam = '1' } = await searchParams
+  const { q = '', page: pageParam = '1', status: statusParam = 'active', sort: sortParam, dir: dirParam } = await searchParams
 
-  const where = q
-    ? {
-        OR: [
-          { user: { name: { contains: q } } },
-          { employeeId: { contains: q } },
-        ],
-      }
-    : {}
+  // Only known values reach the query: the status filter and the sort column are whitelisted
+  const status = statusParam === 'left' || statusParam === 'all' ? statusParam : 'active'
+  const sort: StaffSort = (SORT_COLUMNS as readonly string[]).includes(sortParam ?? '') ? (sortParam as StaffSort) : 'name'
+  const dir: 'asc' | 'desc' = dirParam === 'desc' ? 'desc' : 'asc'
+
+  const where = {
+    AND: [
+      q
+        ? {
+            OR: [
+              { user: { name: { contains: q } } },
+              { employeeId: { contains: q } },
+            ],
+          }
+        : {},
+      status === 'active' ? { dateLeft: null } : status === 'left' ? { dateLeft: { not: null } } : {},
+    ],
+  }
+  const orderBy = sort === 'employeeId'
+    ? [{ employeeId: dir }, { id: 'asc' as const }]
+    : [{ user: { name: dir } }, { id: 'asc' as const }]
 
   const total = await db.staff.count({ where })
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -45,19 +61,27 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
 
   const staffList = await db.staff.findMany({
     where,
-    include: { user: true },
-    orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
+    // Select only the user fields the table shows; never load passwordHash here
+    include: { user: { select: { name: true, email: true } } },
+    orderBy,
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
   })
 
-  const pageHref = (target: number) => {
+  const listParams = (overrides: Record<string, string | undefined>) => {
     const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    if (target > 1) params.set('page', String(target))
+    const values: Record<string, string | undefined> = { q, status, sort, dir, ...overrides }
+    for (const [k, v] of Object.entries(values)) {
+      if (v && !(k === 'status' && v === 'active') && !(k === 'sort' && v === 'name') && !(k === 'dir' && v === 'asc')) params.set(k, v)
+    }
     const qs = params.toString()
     return qs ? `/staff?${qs}` : '/staff'
   }
+  const pageHref = (target: number) => listParams({ page: target > 1 ? String(target) : undefined })
+  // Clicking the active column flips its direction; clicking another column sorts ascending by it
+  const sortHref = (column: StaffSort) =>
+    listParams({ sort: column, dir: column === sort && dir === 'asc' ? 'desc' : 'asc', page: undefined })
+  const sortIndicator = (column: StaffSort) => (sort === column ? (dir === 'asc' ? ' ↑' : ' ↓') : '')
 
   return (
     <div className="space-y-6">
@@ -82,11 +106,18 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
       </div>
 
       {/* Search */}
-      <form method="GET" className="flex gap-3 max-w-sm">
-        <div className="relative flex-1">
+      <form method="GET" className="flex flex-wrap gap-3">
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
+        <select name="status" defaultValue={status} aria-label="Show" className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+          <option value="active">Current staff</option>
+          <option value="left">Left</option>
+          <option value="all">All</option>
+        </select>
+        <div className="relative flex-1 min-w-48 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
-            name="q"
+            name="q" aria-label="Search staff"
             defaultValue={q}
             placeholder="Search by name…"
             className="pl-8 w-full"
@@ -103,8 +134,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Search
           <caption className="sr-only">Staff members</caption>
           <TableHeader>
             <TableRow className="bg-slate-50">
-              <TableHead className="font-semibold text-slate-700">Employee ID</TableHead>
-              <TableHead className="font-semibold text-slate-700">Name</TableHead>
+              <TableHead className="font-semibold text-slate-700"><Link href={sortHref('employeeId')} className="hover:underline">Employee ID{sortIndicator('employeeId')}</Link></TableHead>
+              <TableHead className="font-semibold text-slate-700"><Link href={sortHref('name')} className="hover:underline">Name{sortIndicator('name')}</Link></TableHead>
               <TableHead className="font-semibold text-slate-700">Job Title</TableHead>
               <TableHead className="font-semibold text-slate-700">Department</TableHead>
               <TableHead className="font-semibold text-slate-700">Employment Type</TableHead>

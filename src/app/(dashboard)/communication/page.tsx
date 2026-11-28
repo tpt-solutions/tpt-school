@@ -2,7 +2,7 @@ import { requireSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Pin, Plus, Mail, Bell } from 'lucide-react'
@@ -19,28 +19,49 @@ function categoryLabel(c: string) {
   return c.charAt(0).toUpperCase() + c.slice(1)
 }
 
-export default async function CommunicationPage() {
+const PAGE_SIZE = 50
+
+function pageNumber(value: string | undefined): number {
+  const n = parseInt(value ?? '1', 10)
+  return Number.isInteger(n) && n > 0 ? n : 1
+}
+
+export default async function CommunicationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; npage?: string; mpage?: string }>
+}) {
   const user = await requireSession()
+  const { tab, npage, mpage } = await searchParams
+  const activeTab = tab === 'messages' ? 'messages' : 'notices'
 
   const now = new Date()
 
   // Fetch notices — admin/teacher see all, others see filtered by role
+  const noticeWhere = {
+    AND: [
+      { OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
+      { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
+      ...(user.role !== 'admin' && user.role !== 'teacher'
+        ? [{ OR: [{ targetRoles: 'all' }, { targetRoles: { contains: user.role } }] }]
+        : []),
+    ],
+  }
+  const noticeTotal = await db.notice.count({ where: noticeWhere })
+  const noticePages = Math.max(1, Math.ceil(noticeTotal / PAGE_SIZE))
+  const noticePage = Math.min(pageNumber(npage), noticePages)
   const notices = await db.notice.findMany({
-    where: {
-      AND: [
-        { OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
-        { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
-        ...(user.role !== 'admin' && user.role !== 'teacher'
-          ? [{ OR: [{ targetRoles: 'all' }, { targetRoles: { contains: user.role } }] }]
-          : []),
-      ],
-    },
+    where: noticeWhere,
     include: { author: { select: { name: true } } },
-    orderBy: [{ pinned: 'desc' }, { publishedAt: 'desc' }],
-    take: 50,
+    orderBy: [{ pinned: 'desc' }, { publishedAt: 'desc' }, { id: 'asc' }],
+    skip: (noticePage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
   })
 
   // Inbox messages
+  const messageTotal = await db.messageRecipient.count({ where: { userId: user.id } })
+  const messagePages = Math.max(1, Math.ceil(messageTotal / PAGE_SIZE))
+  const messagePage = Math.min(pageNumber(mpage), messagePages)
   const messages = await db.messageRecipient.findMany({
     where: { userId: user.id },
     include: {
@@ -48,9 +69,30 @@ export default async function CommunicationPage() {
         include: { sender: { select: { name: true } } },
       },
     },
-    orderBy: { message: { createdAt: 'desc' } },
-    take: 50,
+    orderBy: [{ message: { createdAt: 'desc' } }, { messageId: 'asc' }],
+    skip: (messagePage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
   })
+
+  // Pager links keep the active tab and the other list's page
+  const pagerHref = (which: 'notices' | 'messages', target: number) => {
+    const params = new URLSearchParams({ tab: which })
+    const notice = which === 'notices' ? target : noticePage
+    const message = which === 'messages' ? target : messagePage
+    if (notice > 1) params.set('npage', String(notice))
+    if (message > 1) params.set('mpage', String(message))
+    return '/communication?' + params.toString()
+  }
+  const pager = (which: 'notices' | 'messages', page: number, pages: number) =>
+    pages > 1 ? (
+      <nav aria-label={which === 'notices' ? 'Notice pages' : 'Message pages'} className="mt-4 flex items-center justify-between text-sm text-slate-600">
+        <span>Page {page} of {pages}</span>
+        <div className="flex gap-2">
+          <Link href={pagerHref(which, page - 1)} aria-disabled={page <= 1} className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page <= 1 ? ' pointer-events-none opacity-50' : '')}>Previous</Link>
+          <Link href={pagerHref(which, page + 1)} aria-disabled={page >= pages} className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page >= pages ? ' pointer-events-none opacity-50' : '')}>Next</Link>
+        </div>
+      </nav>
+    ) : null
 
   const canPost = user.role === 'admin' || user.role === 'teacher'
   const unreadCount = messages.filter(m => !m.readAt).length
@@ -72,14 +114,14 @@ export default async function CommunicationPage() {
         )}
       </div>
 
-      <Tabs defaultValue="notices">
+      <Tabs defaultValue={activeTab}>
         <TabsList>
           <TabsTrigger value="notices" className="gap-2">
             <Bell className="w-4 h-4" />
             Notices
-            {notices.length > 0 && (
+            {noticeTotal > 0 && (
               <span className="ml-1 text-xs bg-slate-200 text-slate-600 rounded-full px-1.5 py-0.5">
-                {notices.length}
+                {noticeTotal}
               </span>
             )}
           </TabsTrigger>
@@ -138,6 +180,7 @@ export default async function CommunicationPage() {
               ))}
             </div>
           )}
+          {pager('notices', noticePage, noticePages)}
         </TabsContent>
 
         {/* Messages Tab */}
@@ -188,6 +231,7 @@ export default async function CommunicationPage() {
               ))}
             </div>
           )}
+          {pager('messages', messagePage, messagePages)}
         </TabsContent>
       </Tabs>
     </div>

@@ -31,19 +31,38 @@ function formatCurrency(cents: number, symbol: string) {
 
 const INVOICE_PAGE_SIZE = 50
 
+const INVOICE_FILTERS = ['all', 'unpaid', 'partial', 'paid', 'overdue'] as const
+type InvoiceFilter = typeof INVOICE_FILTERS[number]
+
 export default async function FinancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; status?: string; sort?: string }>
 }) {
   await requireRole(['admin'])
-  const { page: pageParam = '1' } = await searchParams
+  const { page: pageParam = '1', status: statusParam, sort: sortParam } = await searchParams
+
+  // Whitelisted filter and sort; anything else falls back to the defaults
+  const statusFilter: InvoiceFilter = (INVOICE_FILTERS as readonly string[]).includes(statusParam ?? '') ? (statusParam as InvoiceFilter) : 'all'
+  const sortByDue = sortParam === 'due'
+  const invoiceWhere = statusFilter === 'all' ? {} : { status: statusFilter }
+  const listParams = (overrides: Record<string, string | undefined>) => {
+    const params = new URLSearchParams()
+    const values: Record<string, string | undefined> = {
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      sort: sortByDue ? 'due' : undefined,
+      ...overrides,
+    }
+    for (const [k, v] of Object.entries(values)) if (v) params.set(k, v)
+    const qs = params.toString()
+    return qs ? `/finance?${qs}` : '/finance'
+  }
 
   const settings = await db.schoolSettings.findFirst()
   const currencySymbol = settings?.currencySymbol ?? '$'
 
   // Overview stats
-  const invoiceTotal = await db.feeInvoice.count()
+  const invoiceTotal = await db.feeInvoice.count({ where: invoiceWhere })
   const invoicePageCount = Math.max(1, Math.ceil(invoiceTotal / INVOICE_PAGE_SIZE))
   const requestedPage = parseInt(pageParam, 10)
   const invoicePage = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), invoicePageCount) : 1
@@ -52,10 +71,11 @@ export default async function FinancePage({
     db.feeInvoice.findMany({ where: { status: { in: ['unpaid', 'partial'] } }, select: { totalAmountCents: true, paidAmountCents: true } }),
     db.feeInvoice.count({ where: { status: 'overdue' } }),
     db.feeInvoice.findMany({
+      where: invoiceWhere,
       include: {
         student: { include: { user: { select: { name: true } } } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: sortByDue ? [{ dueDate: 'asc' }, { id: 'asc' }] : [{ createdAt: 'desc' }, { id: 'asc' }],
       skip: (invoicePage - 1) * INVOICE_PAGE_SIZE,
       take: INVOICE_PAGE_SIZE,
     }),
@@ -147,6 +167,25 @@ export default async function FinancePage({
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="mt-4">
+          <nav aria-label="Filter invoices" className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+            {INVOICE_FILTERS.map((f) => (
+              <Link
+                key={f}
+                href={listParams({ status: f === 'all' ? undefined : f, page: undefined })}
+                aria-current={statusFilter === f ? 'page' : undefined}
+                className={buttonVariants({ variant: statusFilter === f ? 'default' : 'outline', size: 'sm' }) + ' capitalize'}
+              >
+                {f === 'all' ? 'All' : f}
+              </Link>
+            ))}
+            <span className="mx-2 text-slate-300" aria-hidden="true">|</span>
+            <Link
+              href={listParams({ sort: sortByDue ? undefined : 'due', page: undefined })}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              {sortByDue ? 'Sorted by due date' : 'Sort by due date'}
+            </Link>
+          </nav>
           {allInvoices.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
               <DollarSign className="w-10 h-10 mx-auto mb-3 opacity-40" />
@@ -209,14 +248,14 @@ export default async function FinancePage({
               <span>Page {invoicePage} of {invoicePageCount} ({invoiceTotal} invoices)</span>
               <div className="flex gap-2">
                 <Link
-                  href={invoicePage > 1 ? `/finance?page=${invoicePage - 1}` : '/finance'}
+                  href={listParams({ page: invoicePage > 2 ? String(invoicePage - 1) : undefined })}
                   aria-disabled={invoicePage <= 1}
                   className={buttonVariants({ variant: 'outline', size: 'sm' }) + (invoicePage <= 1 ? ' pointer-events-none opacity-50' : '')}
                 >
                   Previous
                 </Link>
                 <Link
-                  href={`/finance?page=${invoicePage + 1}`}
+                  href={listParams({ page: String(invoicePage + 1) })}
                   aria-disabled={invoicePage >= invoicePageCount}
                   className={buttonVariants({ variant: 'outline', size: 'sm' }) + (invoicePage >= invoicePageCount ? ' pointer-events-none opacity-50' : '')}
                 >

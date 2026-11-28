@@ -21,33 +21,70 @@ const TYPE_COLORS: Record<string, string> = {
   project: 'bg-purple-100 text-purple-700',
 }
 
-export default async function GradesPage() {
-  const user = await requireRole(['admin', 'teacher'])
+const GRADE_PAGE_SIZE = 50
+const GRADE_TYPES = ['assessment', 'exam', 'assignment', 'project'] as const
+const SORTS = ['due', 'name', 'class'] as const
 
-  let gradebooks
-  if (user.role === 'admin') {
-    gradebooks = await db.gradebook.findMany({
-      include: {
-        class: true,
-        term: { include: { academicYear: true } },
-        _count: { select: { grades: true } },
-      },
-      orderBy: [{ dueDate: 'desc' }, { class: { name: 'asc' } }],
-    })
-  } else {
+export default async function GradesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string; sort?: string; dir?: string; page?: string }>
+}) {
+  const user = await requireRole(['admin', 'teacher'])
+  const { type: typeParam, sort: sortParam, dir: dirParam, page: pageParam = '1' } = await searchParams
+
+  // Whitelisted filter and sort values only
+  const type = (GRADE_TYPES as readonly string[]).includes(typeParam ?? '') ? typeParam : undefined
+  const sort = (SORTS as readonly string[]).includes(sortParam ?? '') ? (sortParam as (typeof SORTS)[number]) : 'due'
+  const dir: 'asc' | 'desc' = dirParam === 'asc' || dirParam === 'desc' ? dirParam : sort === 'due' ? 'desc' : 'asc'
+  const orderBy =
+    sort === 'name' ? [{ name: dir }, { id: 'asc' as const }] :
+    sort === 'class' ? [{ class: { name: dir } }, { id: 'asc' as const }] :
+    [{ dueDate: dir }, { id: 'asc' as const }]
+
+  let scope: Record<string, unknown> = {}
+  if (user.role !== 'admin') {
     const staff = await db.staff.findUnique({ where: { userId: user.id } })
-    gradebooks = staff
-      ? await db.gradebook.findMany({
-          where: { class: { teachers: { some: { staffId: staff.id } } } },
-          include: {
-            class: true,
-            term: { include: { academicYear: true } },
-            _count: { select: { grades: true } },
-          },
-          orderBy: [{ dueDate: 'desc' }, { class: { name: 'asc' } }],
-        })
-      : []
+    // A teacher sees only gradebooks for classes they teach; no staff profile means nothing
+    scope = staff ? { class: { teachers: { some: { staffId: staff.id } } } } : { id: '__none__' }
   }
+  const where = { ...scope, ...(type ? { type } : {}) }
+
+  const total = await db.gradebook.count({ where })
+  const pageCount = Math.max(1, Math.ceil(total / GRADE_PAGE_SIZE))
+  const requestedPage = parseInt(pageParam, 10)
+  const page = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), pageCount) : 1
+
+  const gradebooks = await db.gradebook.findMany({
+    where,
+    include: {
+      class: true,
+      term: { include: { academicYear: true } },
+      _count: { select: { grades: true } },
+    },
+    orderBy,
+    skip: (page - 1) * GRADE_PAGE_SIZE,
+    take: GRADE_PAGE_SIZE,
+  })
+
+  const listParams = (overrides: Record<string, string | undefined>) => {
+    const params = new URLSearchParams()
+    const values: Record<string, string | undefined> = {
+      type,
+      sort: sort === 'due' ? undefined : sort,
+      dir: dir === (sort === 'due' ? 'desc' : 'asc') ? undefined : dir,
+      ...overrides,
+    }
+    for (const [k, v] of Object.entries(values)) if (v) params.set(k, v)
+    const qs = params.toString()
+    return qs ? `/grades?${qs}` : '/grades'
+  }
+  const sortHref = (column: (typeof SORTS)[number]) => {
+    const defaultDir = column === 'due' ? 'desc' : 'asc'
+    const nextDir = column === sort ? (dir === 'asc' ? 'desc' : 'asc') : defaultDir
+    return listParams({ sort: column, dir: nextDir, page: undefined })
+  }
+  const sortIndicator = (column: (typeof SORTS)[number]) => (sort === column ? (dir === 'asc' ? ' ↑' : ' ↓') : '')
 
   return (
     <div className="space-y-6">
@@ -64,16 +101,28 @@ export default async function GradesPage() {
         </Link>
       </div>
 
+      <nav aria-label="Filter assessments" className="flex flex-wrap items-center gap-2 text-sm">
+        {(['all', ...GRADE_TYPES] as const).map((t) => (
+          <Link
+            key={t}
+            href={listParams({ type: t === 'all' ? undefined : t, page: undefined })}
+            aria-current={(type ?? 'all') === t ? 'page' : undefined}
+            className={buttonVariants({ variant: (type ?? 'all') === t ? 'default' : 'outline', size: 'sm' }) + ' capitalize'}
+          >
+            {t === 'all' ? 'All types' : t}
+          </Link>
+        ))}
+      </nav>
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <Table className="table-stack">
           <caption className="sr-only">Gradebooks</caption>
           <TableHeader>
             <TableRow className="bg-slate-50">
-              <TableHead>Assessment</TableHead>
-              <TableHead>Class</TableHead>
+              <TableHead><Link href={sortHref('name')} className="hover:underline">Assessment{sortIndicator('name')}</Link></TableHead>
+              <TableHead><Link href={sortHref('class')} className="hover:underline">Class{sortIndicator('class')}</Link></TableHead>
               <TableHead>Term</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Due Date</TableHead>
+              <TableHead><Link href={sortHref('due')} className="hover:underline">Due Date{sortIndicator('due')}</Link></TableHead>
               <TableHead className="text-center">Max Score</TableHead>
               <TableHead className="text-center">Grades</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -119,6 +168,27 @@ export default async function GradesPage() {
           </TableBody>
         </Table>
       </div>
+      {pageCount > 1 && (
+        <nav aria-label="Assessment pages" className="flex items-center justify-between text-sm text-slate-600">
+          <span>Page {page} of {pageCount} ({total} assessments)</span>
+          <div className="flex gap-2">
+            <Link
+              href={listParams({ page: page > 1 ? String(page - 1) : undefined })}
+              aria-disabled={page <= 1}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page <= 1 ? ' pointer-events-none opacity-50' : '')}
+            >
+              Previous
+            </Link>
+            <Link
+              href={listParams({ page: String(page + 1) })}
+              aria-disabled={page >= pageCount}
+              className={buttonVariants({ variant: 'outline', size: 'sm' }) + (page >= pageCount ? ' pointer-events-none opacity-50' : '')}
+            >
+              Next
+            </Link>
+          </div>
+        </nav>
+      )}
     </div>
   )
 }
