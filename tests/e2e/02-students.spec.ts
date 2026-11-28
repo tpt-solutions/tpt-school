@@ -16,11 +16,11 @@ test.describe('Students module', () => {
     await expect(page.getByRole('heading', { name: /new student|add student/i })).toBeVisible()
 
     // Fill required fields
-    await page.getByLabel(/Full Name/i).fill('E2E Student Test')
+    await page.getByLabel(/First Name/i).fill('E2E Student')
+    await page.getByLabel(/Last Name/i).fill('Test')
     await page.getByLabel(/Email/i).fill(`e2e-student-${Date.now()}@test.school`)
-    await page.getByLabel(/Student ID/i).fill(`ST${Date.now().toString().slice(-6)}`)
 
-    await page.getByRole('button', { name: /create|save/i }).click()
+    await page.getByRole('button', { name: /enrol student/i }).click()
 
     // Should redirect to student list or detail
     await expect(page).toHaveURL(/\/students(\/|$)/, { timeout: 10_000 })

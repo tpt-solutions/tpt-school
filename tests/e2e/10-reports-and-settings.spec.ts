@@ -11,7 +11,7 @@ test.describe('Reports & Settings', () => {
     await expect(page.getByRole('heading', { name: /reports/i })).toBeVisible()
     await expect(page.getByText(/attendance report/i)).toBeVisible()
     await expect(page.getByText(/grade summary/i)).toBeVisible()
-    await expect(page.getByText(/report cards/i)).toBeVisible()
+    await expect(page.getByRole('link', { name: /report cards/i }).first()).toBeVisible()
   })
 
   test('report cards page loads', async ({ page }) => {

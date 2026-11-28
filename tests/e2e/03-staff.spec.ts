@@ -13,7 +13,7 @@ test.describe('Staff module', () => {
 
   test('new staff form renders', async ({ page }) => {
     await page.goto('/staff/new')
-    await expect(page.getByLabel(/Full Name/i)).toBeVisible()
+    await expect(page.getByLabel(/First Name/i)).toBeVisible()
     await expect(page.getByLabel(/Email/i)).toBeVisible()
   })
 })

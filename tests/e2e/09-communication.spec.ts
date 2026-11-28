@@ -12,7 +12,7 @@ test.describe('Communication module', () => {
   })
 
   test('compose message form renders', async ({ page }) => {
-    await page.goto('/communication/compose')
+    await page.goto('/communication/messages/compose')
     await expect(page.getByRole('heading', { name: /compose|new message/i })).toBeVisible()
   })
 
