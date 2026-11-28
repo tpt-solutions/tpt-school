@@ -42,7 +42,6 @@ export default async function CalendarPage() {
           readOnly
           value={feedUrl}
           aria-label="Calendar feed URL"
-          onFocus={e => e.currentTarget.select()}
           className="mt-3 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700"
         />
       </details>

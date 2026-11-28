@@ -257,7 +257,10 @@ export default async function ClassDetailPage({ params }: PageProps) {
                 {cls.gradebooks.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-10 text-slate-400">
-                      No assessments yet
+                      <p>No assessments yet</p>
+                      <Link href="/grades/new" className={buttonVariants({ size: 'sm' }) + ' mt-3'}>
+                        Create the first assessment
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ) : (

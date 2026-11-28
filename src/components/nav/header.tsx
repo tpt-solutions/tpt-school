@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -96,12 +97,15 @@ export default function DashboardHeader({ schoolName, user }: HeaderProps) {
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div>
-                <p className="font-medium">{user.name}</p>
-                <p className="text-xs text-slate-500 font-normal mt-0.5">{user.email}</p>
-              </div>
-            </DropdownMenuLabel>
+            {/* Base UI requires a group label to sit inside a group */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div>
+                  <p className="font-medium">{user.name}</p>
+                  <p className="text-xs text-slate-500 font-normal mt-0.5">{user.email}</p>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"

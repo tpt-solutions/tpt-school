@@ -138,7 +138,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
-            name="q"
+            name="q" aria-label="Search students"
             defaultValue={q}
             placeholder="Search by name or student ID…"
             className="pl-8 w-full"

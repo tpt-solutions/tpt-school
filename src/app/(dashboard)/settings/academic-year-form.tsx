@@ -68,11 +68,11 @@ function TermRow({ term }: { term: Term }) {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Start Date</Label>
-            <Input name="startDate" type="date" defaultValue={formatForInput(term.startDate)} required className="h-7 text-xs" />
+            <Input name="startDate" type="date" aria-label="Term start date" defaultValue={formatForInput(term.startDate)} required className="h-7 text-xs" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">End Date</Label>
-            <Input name="endDate" type="date" defaultValue={formatForInput(term.endDate)} required className="h-7 text-xs" />
+            <Input name="endDate" type="date" aria-label="Term end date" defaultValue={formatForInput(term.endDate)} required className="h-7 text-xs" />
           </div>
         </div>
         <div className="flex gap-1.5">
@@ -189,11 +189,11 @@ export default function AcademicYearForm({ years }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="startDate">Start Date *</Label>
-                <Input id="startDate" name="startDate" type="date" required />
+                <Input id="startDate" name="startDate" type="date" aria-label="Year start date" required />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="endDate">End Date *</Label>
-                <Input id="endDate" name="endDate" type="date" required />
+                <Input id="endDate" name="endDate" type="date" aria-label="Year end date" required />
               </div>
             </div>
             <p className="text-xs text-slate-500">4 terms will be auto-generated from the date range.</p>
@@ -284,11 +284,11 @@ export default function AcademicYearForm({ years }: Props) {
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">Start Date</Label>
-                              <Input name="startDate" type="date" required />
+                              <Input name="startDate" type="date" aria-label="New term start date" required />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">End Date</Label>
-                              <Input name="endDate" type="date" required />
+                              <Input name="endDate" type="date" aria-label="New term end date" required />
                             </div>
                           </div>
                           <div className="flex gap-2">
