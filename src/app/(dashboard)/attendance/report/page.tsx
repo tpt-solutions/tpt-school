@@ -147,7 +147,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-600">Start Date</label>
             <input
-              type="date"
+              type="date" aria-label="From date"
               name="startDate"
               defaultValue={filters.startDate ?? ''}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -156,7 +156,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-600">End Date</label>
             <input
-              type="date"
+              type="date" aria-label="To date"
               name="endDate"
               defaultValue={filters.endDate ?? ''}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -201,7 +201,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
             <h2 className="font-semibold text-slate-800">Student Summary</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-stack">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="text-left px-6 py-3 font-medium text-slate-600">Student</th>
@@ -219,13 +219,13 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
                   const rate = total > 0 ? Math.round(((row.present + row.late) / total) * 100) : 0
                   return (
                     <tr key={row.name} className="hover:bg-slate-50">
-                      <td className="px-6 py-3 font-medium text-slate-800">{row.name}</td>
-                      <td className="text-center px-4 py-3 text-green-700 font-medium">{row.present}</td>
-                      <td className="text-center px-4 py-3 text-red-600 font-medium">{row.absent}</td>
-                      <td className="text-center px-4 py-3 text-yellow-600 font-medium">{row.late}</td>
-                      <td className="text-center px-4 py-3 text-blue-600 font-medium">{row.excused}</td>
-                      <td className="text-center px-4 py-3 text-slate-700">{total}</td>
-                      <td className="text-center px-4 py-3">
+                      <td className="px-6 py-3 font-medium text-slate-800" data-label="Student">{row.name}</td>
+                      <td className="text-center px-4 py-3 text-green-700 font-medium" data-label="Present">{row.present}</td>
+                      <td className="text-center px-4 py-3 text-red-600 font-medium" data-label="Absent">{row.absent}</td>
+                      <td className="text-center px-4 py-3 text-yellow-600 font-medium" data-label="Late">{row.late}</td>
+                      <td className="text-center px-4 py-3 text-blue-600 font-medium" data-label="Excused">{row.excused}</td>
+                      <td className="text-center px-4 py-3 text-slate-700" data-label="Total">{total}</td>
+                      <td className="text-center px-4 py-3" data-label="Rate">
                         <span className={`font-medium ${rate >= 90 ? 'text-green-600' : rate >= 75 ? 'text-yellow-600' : 'text-red-600'}`}>
                           {rate}%
                         </span>
@@ -251,7 +251,7 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-stack">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="text-left px-6 py-3 font-medium text-slate-600">Student</th>
@@ -264,19 +264,19 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
               <tbody className="divide-y divide-slate-50">
                 {records.map((rec) => (
                   <tr key={rec.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-3 font-medium text-slate-800">
+                    <td className="px-6 py-3 font-medium text-slate-800" data-label="Student">
                       {rec.student.user.name}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-slate-600" data-label="Date">
                       {format(new Date(rec.date), 'dd MMM yyyy')}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{rec.term.name}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-slate-500" data-label="Term">{rec.term.name}</td>
+                    <td className="px-4 py-3" data-label="Status">
                       <Badge className={STATUS_COLORS[rec.status] + ' border-0 capitalize'}>
                         {rec.status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{rec.notes ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-500" data-label="Notes">{rec.notes ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

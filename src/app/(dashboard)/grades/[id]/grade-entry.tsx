@@ -120,7 +120,7 @@ export default function GradeEntry({ gradebookId, maxScore, students }: GradeEnt
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-stack">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="text-left px-6 py-3 font-medium text-slate-600">Student</th>
@@ -142,7 +142,7 @@ export default function GradeEntry({ gradebookId, maxScore, students }: GradeEnt
                   key={student.studentId}
                   className={student.submittedAt && !student.gradedAt ? 'bg-amber-50/40 hover:bg-amber-50' : 'hover:bg-slate-50'}
                 >
-                  <td className="px-6 py-3">
+                  <td className="px-6 py-3" data-label="Student">
                     <p className="font-medium text-slate-800">{student.name}</p>
                     <p className="text-xs text-slate-400 font-mono">{student.studentCode}</p>
                     {student.submittedAt && (
@@ -164,7 +164,7 @@ export default function GradeEntry({ gradebookId, maxScore, students }: GradeEnt
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" data-label="Score /">
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
@@ -183,7 +183,7 @@ export default function GradeEntry({ gradebookId, maxScore, students }: GradeEnt
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" data-label="Grade">
                     <Input
                       value={grades[student.studentId]}
                       onChange={(e) => setGrades({ ...grades, [student.studentId]: e.target.value })}
@@ -192,7 +192,7 @@ export default function GradeEntry({ gradebookId, maxScore, students }: GradeEnt
                       maxLength={3}
                     />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" data-label="Comment">
                     <Textarea
                       value={comments[student.studentId]}
                       onChange={(e) => setComments({ ...comments, [student.studentId]: e.target.value })}

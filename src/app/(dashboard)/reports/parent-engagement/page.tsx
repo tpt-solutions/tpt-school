@@ -164,7 +164,7 @@ export default async function ParentEngagementPage() {
 
       <Card className="border-slate-100 shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-stack">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Parent</th>
@@ -178,18 +178,18 @@ export default async function ParentEngagementPage() {
             <tbody className="divide-y divide-slate-50">
               {rows.map(row => (
                 <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900">{row.name}</td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{row.children.join(', ') || '—'}</td>
-                  <td className={`px-4 py-3 font-medium ${LOGIN_COLORS[row.loginActivity]}`}>
+                  <td className="px-4 py-3 font-medium text-slate-900" data-label="Parent">{row.name}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs" data-label="Children">{row.children.join(', ') || '—'}</td>
+                  <td className={`px-4 py-3 font-medium ${LOGIN_COLORS[row.loginActivity]}`} data-label="Login">
                     {LOGIN_LABELS[row.loginActivity]}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-slate-700" data-label="Notices Read">
                     {row.noticeReadRate != null ? `${row.noticeReadRate}%` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-slate-700" data-label="Fees On Time">
                     {row.paymentPunctuality != null ? `${row.paymentPunctuality}%` : '—'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" data-label="Level">
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full capitalize ${LEVEL_COLORS[row.level]}`}>
                       {row.level}
                     </span>

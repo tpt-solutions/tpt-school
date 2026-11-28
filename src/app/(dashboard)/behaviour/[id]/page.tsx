@@ -137,7 +137,7 @@ export default async function IncidentDetailPage({ params }: PageProps) {
           {incident.suspensions.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-6">No suspensions linked to this incident.</p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-stack">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="text-left px-4 py-3 font-medium text-slate-600">Type</th>
@@ -150,11 +150,11 @@ export default async function IncidentDetailPage({ params }: PageProps) {
               <tbody className="divide-y divide-slate-50">
                 {incident.suspensions.map(s => (
                   <tr key={s.id}>
-                    <td className="px-4 py-3 capitalize text-slate-700">{s.type.replace('-', ' ')}</td>
-                    <td className="px-4 py-3 text-slate-600">{format(new Date(s.startDate), 'dd MMM yyyy')}</td>
-                    <td className="px-4 py-3 text-slate-600">{format(new Date(s.endDate), 'dd MMM yyyy')}</td>
-                    <td className="px-4 py-3 text-slate-600">{s.totalDays}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 capitalize text-slate-700" data-label="Type">{s.type.replace('-', ' ')}</td>
+                    <td className="px-4 py-3 text-slate-600" data-label="Start">{format(new Date(s.startDate), 'dd MMM yyyy')}</td>
+                    <td className="px-4 py-3 text-slate-600" data-label="End">{format(new Date(s.endDate), 'dd MMM yyyy')}</td>
+                    <td className="px-4 py-3 text-slate-600" data-label="Days">{s.totalDays}</td>
+                    <td className="px-4 py-3" data-label="Status">
                       {s.returnDate ? (
                         <Badge variant="secondary">Returned</Badge>
                       ) : (

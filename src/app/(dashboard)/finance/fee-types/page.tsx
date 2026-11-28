@@ -52,7 +52,7 @@ export default async function FeeTypesPage() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-slate-100">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-stack">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Name</th>
@@ -65,20 +65,20 @@ export default async function FeeTypesPage() {
                 <tbody className="divide-y divide-slate-50">
                   {feeTypes.map(ft => (
                     <tr key={ft.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label="Name">
                         <p className="font-medium text-slate-900">{ft.name}</p>
                         {ft.description && (
                           <p className="text-xs text-slate-500 mt-0.5">{ft.description}</p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-900">
+                      <td className="px-4 py-3 text-right font-medium text-slate-900" data-label="Amount">
                         {formatCurrency(ft.amountCents, currencySymbol)}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 capitalize">{ft.frequency}</td>
-                      <td className="px-4 py-3 text-slate-600">
+                      <td className="px-4 py-3 text-slate-600 capitalize" data-label="Frequency">{ft.frequency}</td>
+                      <td className="px-4 py-3 text-slate-600" data-label="Year Level">
                         {ft.yearLevel != null ? `Year ${ft.yearLevel}` : 'All years'}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label="Status">
                         <span
                           className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                             ft.active

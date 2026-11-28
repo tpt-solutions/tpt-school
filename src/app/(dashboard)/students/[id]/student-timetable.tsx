@@ -28,7 +28,7 @@ export default function StudentTimetable({ slots }: { slots: Slot[] }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse table-stack">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide w-20">Period</th>
@@ -42,7 +42,7 @@ export default function StudentTimetable({ slots }: { slots: Slot[] }) {
           <tbody>
             {PERIODS.map((period) => (
               <tr key={period} className="border-b border-slate-100 last:border-0">
-                <td className="px-3 py-3 text-xs text-slate-400 font-medium align-top whitespace-nowrap">
+                <td className="px-3 py-3 text-xs text-slate-400 font-medium align-top whitespace-nowrap" data-label="Period">
                   P{period}
                   {slotMap.get(`1-${period}`) && (
                     <div className="text-slate-300">{slotMap.get(`1-${period}`)!.startTime}</div>
@@ -51,7 +51,7 @@ export default function StudentTimetable({ slots }: { slots: Slot[] }) {
                 {[1, 2, 3, 4, 5].map((day) => {
                   const slot = slotMap.get(`${day}-${period}`)
                   return (
-                    <td key={day} className="px-2 py-2 align-top">
+                    <td key={day} data-label={day} className="px-2 py-2 align-top">
                       {slot ? (
                         <div className="rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-2">
                           <p className="font-medium text-primary text-xs leading-tight">{slot.class.name}</p>

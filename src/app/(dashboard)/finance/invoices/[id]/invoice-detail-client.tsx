@@ -168,7 +168,7 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
           <CardTitle className="text-base">Line Items</CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-stack">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Description</th>
@@ -178,15 +178,15 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
             <tbody className="divide-y divide-slate-50">
               {invoice.items.map(item => (
                 <tr key={item.id}>
-                  <td className="px-4 py-3 text-slate-700">{item.description}</td>
-                  <td className="px-4 py-3 text-right text-slate-900">
+                  <td className="px-4 py-3 text-slate-700" data-label="Description">{item.description}</td>
+                  <td className="px-4 py-3 text-right text-slate-900" data-label="Amount">
                     {fmtCurrency(item.amountCents, currencySymbol)}
                   </td>
                 </tr>
               ))}
               <tr className="bg-slate-50 font-semibold">
-                <td className="px-4 py-3 text-slate-900">Total</td>
-                <td className="px-4 py-3 text-right text-slate-900">
+                <td className="px-4 py-3 text-slate-900" data-label="Description">Total</td>
+                <td className="px-4 py-3 text-right text-slate-900" data-label="Amount">
                   {fmtCurrency(invoice.totalAmountCents, currencySymbol)}
                 </td>
               </tr>
@@ -211,7 +211,7 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
               No payments recorded yet.
             </p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-stack">
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left py-2 font-medium text-slate-600">Date</th>
@@ -223,12 +223,12 @@ export default function InvoiceDetailClient({ invoice, currencySymbol }: Props) 
               <tbody className="divide-y divide-slate-50">
                 {invoice.payments.map(p => (
                   <tr key={p.id}>
-                    <td className="py-2.5 text-slate-600">
+                    <td className="py-2.5 text-slate-600" data-label="Date">
                       {format(new Date(p.paidAt), 'dd MMM yyyy')}
                     </td>
-                    <td className="py-2.5 text-slate-600 capitalize">{p.method}</td>
-                    <td className="py-2.5 text-slate-500">{p.reference ?? '—'}</td>
-                    <td className="py-2.5 text-right text-green-700 font-medium">
+                    <td className="py-2.5 text-slate-600 capitalize" data-label="Method">{p.method}</td>
+                    <td className="py-2.5 text-slate-500" data-label="Reference">{p.reference ?? '—'}</td>
+                    <td className="py-2.5 text-right text-green-700 font-medium" data-label="Amount">
                       {fmtCurrency(p.amountCents, currencySymbol)}
                     </td>
                   </tr>

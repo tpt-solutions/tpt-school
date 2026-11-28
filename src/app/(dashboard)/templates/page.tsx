@@ -93,7 +93,7 @@ export default async function TemplatesPage() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto rounded-md border border-slate-200">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm table-stack">
                   <caption className="sr-only">Example rows for {t.title}</caption>
                   <thead className="bg-slate-50">
                     <tr>
@@ -108,7 +108,7 @@ export default async function TemplatesPage() {
                     {rows.map((r, ri) => (
                       <tr key={ri} className="border-t border-slate-100">
                         {r.map((c, ci) => (
-                          <td key={ci} className="px-3 py-2 text-slate-600 whitespace-nowrap">{c}</td>
+                          <td key={ci} data-label={header[ci]} className="px-3 py-2 text-slate-600 whitespace-nowrap">{c}</td>
                         ))}
                       </tr>
                     ))}

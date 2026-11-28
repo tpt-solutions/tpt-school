@@ -160,7 +160,7 @@ export default async function GradesReportPage({
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-100">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-stack">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Student</th>
@@ -171,9 +171,9 @@ export default async function GradesReportPage({
             <tbody className="divide-y divide-slate-50">
               {rows.map(row => (
                 <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900">{row.name}</td>
-                  <td className="px-4 py-3 text-center text-slate-600">{row.scores.length}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 font-medium text-slate-900" data-label="Student">{row.name}</td>
+                  <td className="px-4 py-3 text-center text-slate-600" data-label="Grades Recorded">{row.scores.length}</td>
+                  <td className="px-4 py-3 text-center" data-label="Average Score">
                     {row.avg != null ? (
                       <span
                         className={`font-semibold ${
@@ -195,11 +195,11 @@ export default async function GradesReportPage({
 
               {/* Class Average Row */}
               <tr className="bg-slate-100 font-semibold">
-                <td className="px-4 py-3 text-slate-700">Class Average</td>
-                <td className="px-4 py-3 text-center text-slate-700">
+                <td className="px-4 py-3 text-slate-700" data-label="Student">Class Average</td>
+                <td className="px-4 py-3 text-center text-slate-700" data-label="Grades Recorded">
                   {rows.reduce((s, r) => s + r.scores.length, 0)}
                 </td>
-                <td className="px-4 py-3 text-center">
+                <td className="px-4 py-3 text-center" data-label="Average Score">
                   {classAvg != null ? (
                     <span className="text-slate-900">{classAvg}%</span>
                   ) : (

@@ -106,7 +106,7 @@ export default async function AttendanceReportPage({
               <label className="text-xs font-medium text-slate-600 block">From Date</label>
               <input
                 name="from"
-                type="date"
+                type="date" aria-label="From date"
                 defaultValue={sp.from ?? ''}
                 className="border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
@@ -115,7 +115,7 @@ export default async function AttendanceReportPage({
               <label className="text-xs font-medium text-slate-600 block">To Date</label>
               <input
                 name="to"
-                type="date"
+                type="date" aria-label="To date"
                 defaultValue={sp.to ?? ''}
                 className="border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
@@ -171,7 +171,7 @@ export default async function AttendanceReportPage({
         <div className="text-center py-16 text-slate-400">No students found for the selected filters.</div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-100">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-stack">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Student</th>
@@ -186,15 +186,15 @@ export default async function AttendanceReportPage({
             <tbody className="divide-y divide-slate-50">
               {studentStats.map(s => (
                 <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900">{s.name}</td>
-                  <td className="px-4 py-3 text-center text-slate-600">
+                  <td className="px-4 py-3 font-medium text-slate-900" data-label="Student">{s.name}</td>
+                  <td className="px-4 py-3 text-center text-slate-600" data-label="Year">
                     {s.yearLevel != null ? `Y${s.yearLevel}` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-center text-slate-700">{s.total}</td>
-                  <td className="px-4 py-3 text-center text-green-700">{s.present}</td>
-                  <td className="px-4 py-3 text-center text-red-600">{s.absent}</td>
-                  <td className="px-4 py-3 text-center text-amber-600">{s.late}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 text-center text-slate-700" data-label="Total Days">{s.total}</td>
+                  <td className="px-4 py-3 text-center text-green-700" data-label="Present">{s.present}</td>
+                  <td className="px-4 py-3 text-center text-red-600" data-label="Absent">{s.absent}</td>
+                  <td className="px-4 py-3 text-center text-amber-600" data-label="Late">{s.late}</td>
+                  <td className="px-4 py-3 text-center" data-label="Attendance %">
                     {s.presentPct != null ? (
                       <span
                         className={`font-semibold ${

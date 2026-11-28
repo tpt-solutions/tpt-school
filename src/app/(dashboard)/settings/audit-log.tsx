@@ -31,7 +31,7 @@ export default function AuditLogView({ logs }: { logs: Log[] }) {
           <p className="text-sm text-slate-500 py-4 text-center">No audit events recorded yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-stack">
               <thead>
                 <tr className="border-b border-slate-200">
                   <th className="text-left py-2 px-3 font-medium text-slate-600">When</th>
@@ -43,21 +43,21 @@ export default function AuditLogView({ logs }: { logs: Log[] }) {
               <tbody className="divide-y divide-slate-100">
                 {logs.map(log => (
                   <tr key={log.id} className="hover:bg-slate-50">
-                    <td className="py-2 px-3 whitespace-nowrap text-slate-500">
+                    <td className="py-2 px-3 whitespace-nowrap text-slate-500" data-label="When">
                       {new Date(log.createdAt).toLocaleString()}
                     </td>
-                    <td className="py-2 px-3 whitespace-nowrap">
+                    <td className="py-2 px-3 whitespace-nowrap" data-label="User">
                       <span className="font-medium text-slate-800">{log.user.name}</span>
                       <br />
                       <span className="text-xs text-slate-400">{log.user.email}</span>
                     </td>
-                    <td className="py-2 px-3 whitespace-nowrap">
+                    <td className="py-2 px-3 whitespace-nowrap" data-label="Action">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ACTION_COLORS[log.action] ?? 'bg-slate-100 text-slate-700'}`}>
                         {log.action}
                       </span>
                       <span className="ml-2 text-xs text-slate-500">{log.entityType}</span>
                     </td>
-                    <td className="py-2 px-3 text-slate-700 max-w-md truncate">{log.summary}</td>
+                    <td className="py-2 px-3 text-slate-700 max-w-md truncate" data-label="Summary">{log.summary}</td>
                   </tr>
                 ))}
               </tbody>

@@ -121,7 +121,7 @@ export default async function ReportCardsPage({
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-stack">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Student</th>
@@ -133,7 +133,7 @@ export default async function ReportCardsPage({
             <tbody className="divide-y divide-slate-50">
               {students.map(s => (
                 <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" data-label="Student">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
                         {s.user.name.charAt(0).toUpperCase()}
@@ -141,15 +141,15 @@ export default async function ReportCardsPage({
                       <span className="font-medium text-slate-900">{s.user.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-slate-600">{s.studentId}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 font-mono text-slate-600" data-label="Student ID">{s.studentId}</td>
+                  <td className="px-4 py-3 text-center" data-label="Year Level">
                     {s.yearLevel ? (
                       <Badge variant="outline">Year {s.yearLevel}</Badge>
                     ) : (
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right" data-label="Actions">
                     <div className="flex items-center justify-end gap-2">
                       <Link
                         href={`/reports/report-cards/${s.id}${termId ? `?termId=${termId}` : ''}`}
