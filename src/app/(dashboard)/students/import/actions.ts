@@ -7,6 +7,7 @@ import { nextStudentId, withIdRetry } from '@/lib/ids'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { field, parseWith } from '@/lib/form'
+import { queueAccountSetupEmail } from '@/lib/account-setup'
 
 // Each row triggers a password hash, so cap the batch size to keep one request bounded.
 const MAX_IMPORT_ROWS = 1000
@@ -90,6 +91,8 @@ export async function importStudentsAction(rows: ImportStudentRow[]): Promise<Im
         })
       }))
 
+      // Tell the new student how to set a password; a failure to queue must not undo the import
+      await queueAccountSetupEmail(email, name).catch(() => {})
       imported++
     } catch (err) {
       errors.push(`Row for ${row.email}: ${err instanceof Error ? err.message : 'Unknown error'}`)

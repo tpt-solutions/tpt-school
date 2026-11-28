@@ -7,6 +7,7 @@ import { logAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { field, parseWith } from '@/lib/form'
+import { queueAccountSetupEmail } from '@/lib/account-setup'
 
 // Each new guardian needs a password hash, so cap the batch to keep one request bounded.
 const MAX_IMPORT_ROWS = 1000
@@ -123,8 +124,13 @@ export async function importGuardiansAction(rows: Record<string, string>[]): Pro
         return 'imported' as const
       })
 
-      if (outcome === 'skipped') skipped++
-      else imported++
+      if (outcome === 'skipped') {
+        skipped++
+      } else {
+        imported++
+        // Only brand-new accounts need a set-up email; an existing parent already has a password
+        if (!existingUser) await queueAccountSetupEmail(email, `${row.firstName} ${row.lastName}`).catch(() => {})
+      }
     } catch (err) {
       errors.push(`Row for ${email}: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
