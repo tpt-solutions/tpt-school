@@ -5,9 +5,10 @@ import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { teachesClass } from '@/lib/access'
-import { queryDate } from '@/lib/form'
+import { field, parseWith, queryDate } from '@/lib/form'
 import { checkTruancy } from '@/lib/truancy'
 import { notifyGuardiansOfAbsences } from '@/lib/absence-notify'
+import { z } from 'zod'
 
 const ATTENDANCE_STATUSES = ['present', 'absent', 'late', 'excused'] as const
 
@@ -17,28 +18,43 @@ export interface AttendanceRecord {
   notes?: string
 }
 
+const rollSchema = z.object({
+  classId: field.required('Class', 64),
+  records: z
+    .array(
+      z.object({
+        studentId: field.required('Student', 64),
+        status: field.oneOf('Attendance status', ATTENDANCE_STATUSES),
+        notes: field.optional('Notes', 500),
+      }),
+    )
+    .max(500, { message: 'Too many records in one roll.' }),
+})
+
 export async function saveAttendanceAction(
   classId: string,
   records: AttendanceRecord[]
 ) {
   const session = await requireRole(['admin', 'teacher'])
 
-  if (!(await teachesClass(session, classId))) {
+  const parsed = parseWith(rollSchema, { classId, records })
+  if (!parsed.ok) return { error: parsed.error }
+  const input = parsed.data
+  const roll = input.records
+
+  if (!(await teachesClass(session, input.classId))) {
     return { error: 'You are not a teacher of this class' }
   }
 
   // Every student in the roll must be actively enrolled in this class
   const enrolled = new Set(
     (await db.classEnrolment.findMany({
-      where: { classId, status: 'active' },
+      where: { classId: input.classId, status: 'active' },
       select: { studentId: true },
     })).map(e => e.studentId)
   )
-  if (records.some(r => !enrolled.has(r.studentId))) {
+  if (roll.some(r => !enrolled.has(r.studentId))) {
     return { error: 'One or more students are not enrolled in this class' }
-  }
-  if (records.some(r => !ATTENDANCE_STATUSES.includes(r.status as (typeof ATTENDANCE_STATUSES)[number]))) {
-    return { error: `Attendance status must be one of: ${ATTENDANCE_STATUSES.join(', ')}` }
   }
 
   // Find the current term
@@ -60,7 +76,7 @@ export async function saveAttendanceAction(
   try {
     // Upsert each attendance record
     await Promise.all(
-      records.map((record) =>
+      roll.map((record) =>
         db.attendance.upsert({
           where: { studentId_date: { studentId: record.studentId, date: today } },
           create: {
@@ -83,7 +99,7 @@ export async function saveAttendanceAction(
     )
 
     // Run truancy checks for all students in the roll (fire-and-forget, don't block save)
-    const absentStudents = records.filter(r => r.status === 'absent').map(r => r.studentId)
+    const absentStudents = roll.filter(r => r.status === 'absent').map(r => r.studentId)
     if (absentStudents.length > 0) {
       await Promise.all(absentStudents.map(sid => checkTruancy(sid, term.id)))
       // Never throws, so a mail problem cannot make the roll save look like it failed.
@@ -92,7 +108,7 @@ export async function saveAttendanceAction(
       )
     }
 
-    revalidatePath(`/attendance/roll/${classId}`)
+    revalidatePath(`/attendance/roll/${input.classId}`)
     revalidatePath('/attendance')
     revalidatePath('/behaviour')
     return { success: true }
@@ -109,12 +125,22 @@ export async function generateAttendanceCodeAction(
 ) {
   const session = await requireRole(['admin', 'teacher'])
 
-  if (!(await teachesClass(session, classId))) {
-    return { error: 'You are not a teacher of this class' }
-  }
+  const parsed = parseWith(
+    z.object({
+      classId: field.required('Class', 64),
+      termId: field.required('Term', 64),
+      windowMins: z
+        .number({ message: 'Window must be a whole number of minutes.' })
+        .int({ message: 'Window must be a whole number of minutes.' })
+        .min(1, { message: 'Window must be between 1 and 60 minutes' })
+        .max(60, { message: 'Window must be between 1 and 60 minutes' }),
+    }),
+    { classId, termId, windowMins },
+  )
+  if (!parsed.ok) return { error: parsed.error }
 
-  if (!Number.isInteger(windowMins) || windowMins < 1 || windowMins > 60) {
-    return { error: 'Window must be between 1 and 60 minutes' }
+  if (!(await teachesClass(session, parsed.data.classId))) {
+    return { error: 'You are not a teacher of this class' }
   }
 
   // crypto-grade randomness: this code gates attendance self-check-in

@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
+import { z } from 'zod'
 
 const TOKEN_LIFETIME_MS = 60 * 60 * 1000 // 1 hour
 const REQUEST_COOLDOWN_MS = 5 * 60 * 1000 // one reset email per address every 5 minutes
@@ -25,8 +26,11 @@ function escapeHtml(value: string): string {
 export async function requestPasswordResetAction(
   email: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const normalised = email.trim().toLowerCase()
+  const normalised = typeof email === 'string' ? email.trim().toLowerCase() : ''
   if (!normalised) return { success: false, error: 'Email is required.' }
+  if (normalised.length > 254 || !z.email().safeParse(normalised).success) {
+    return { success: false, error: 'Enter a valid email address.' }
+  }
 
   // Always return success to avoid user enumeration
   const user = await db.user.findUnique({ where: { email: normalised } })
@@ -78,9 +82,15 @@ export async function resetPasswordAction(
   token: string,
   newPassword: string,
 ): Promise<{ success: boolean; error?: string }> {
-  if (!token) return { success: false, error: 'Invalid reset link.' }
-  if (!newPassword || newPassword.length < 8) {
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) {
+    return { success: false, error: 'Invalid reset link.' }
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
     return { success: false, error: 'Password must be at least 8 characters.' }
+  }
+  // bcrypt ignores everything past 72 bytes, so a longer password would silently be truncated
+  if (Buffer.byteLength(newPassword, 'utf8') > 72) {
+    return { success: false, error: 'Password must be 72 bytes or fewer.' }
   }
 
   const tokenHash = hashToken(token)

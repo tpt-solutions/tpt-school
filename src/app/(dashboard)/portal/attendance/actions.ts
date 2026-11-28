@@ -7,6 +7,9 @@ import { isCodeEntryAllowed, recordCodeFailure } from '@/lib/rate-limit'
 export async function submitAttendanceCodeAction(code: string): Promise<{ success?: true; error?: string }> {
   const session = await requireRole(['student'])
 
+  // Codes are always six digits; reject anything else before it reaches the database
+  if (typeof code !== 'string' || !/^\d{6}$/.test(code)) return { error: 'Invalid code' }
+
   const student = await db.student.findFirst({
     where: { userId: session.id },
   })

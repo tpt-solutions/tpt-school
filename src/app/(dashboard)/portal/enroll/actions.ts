@@ -62,6 +62,9 @@ export async function submitParentEnrolmentRequestAction(
   if (message && message.trim().length > 1000) {
     return { success: false, error: 'Message must be 1000 characters or fewer.' }
   }
+  if (!classId || classId.length > 64 || !studentId || studentId.length > 64) {
+    return { success: false, error: 'Choose a class and student.' }
+  }
 
   if (session.role === 'parent') {
     const parent = await db.parent.findUnique({

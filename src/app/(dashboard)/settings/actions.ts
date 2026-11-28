@@ -396,11 +396,20 @@ export async function updateAiProviderAction(
     await requireRole(['admin'])
     const { encrypt } = await import('@/lib/crypto')
 
-    const aiProvider = (formData.get('aiProvider') as string) || 'none'
-    const aiApiKey = (formData.get('aiApiKey') as string)?.trim() || null
-    const aiModel = (formData.get('aiModel') as string)?.trim() || null
-    const aiBaseUrl = (formData.get('aiBaseUrl') as string)?.trim() || null
-    const aiReportMode = (formData.get('aiReportMode') as string) || 'assist'
+    // Provider and mode must be known values; the base URL must be http(s) so nothing
+    // like javascript: is stored and later used as an endpoint
+    const parsed = parseWith(
+      z.object({
+        aiProvider: z.string().nullish().transform(v => v || 'none').pipe(field.oneOf('AI provider', ['none', 'anthropic', 'openrouter', 'local'])),
+        aiApiKey: field.optional('AI API key', 500),
+        aiModel: field.optional('AI model', 120),
+        aiBaseUrl: field.optionalHttpUrl('AI base URL'),
+        aiReportMode: z.string().nullish().transform(v => v || 'assist').pipe(field.oneOf('Report mode', ['assist', 'auto'])),
+      }),
+      formRecord(formData),
+    )
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const { aiProvider, aiApiKey, aiModel, aiBaseUrl, aiReportMode } = parsed.data
 
     const existing = await db.schoolSettings.findFirst()
     if (!existing) return { success: false, error: 'School settings not found.' }

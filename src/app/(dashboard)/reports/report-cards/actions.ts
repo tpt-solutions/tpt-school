@@ -1,7 +1,9 @@
 'use server'
 
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
+import { field, parseWith } from '@/lib/form'
 import { revalidatePath } from 'next/cache'
 import { generateReportComment, ReportCardContext } from '@/lib/ai'
 import { sendEmail, reportCardEmailHtml } from '@/lib/email'
@@ -100,23 +102,36 @@ export async function saveReportCardAction(
   try {
     await requireRole(['admin', 'teacher'])
 
-    const term = await db.term.findUnique({ where: { id: termId }, include: { academicYear: true } })
+    const parsed = parseWith(
+      z.object({
+        studentId: field.required('Student', 64),
+        termId: field.required('Term', 64),
+        comments: field.optional('Comments', 5000),
+        teacherNotes: field.optional('Teacher notes', 5000),
+        principalNotes: field.optional('Principal notes', 5000),
+      }),
+      { studentId, termId, ...data },
+    )
+    if (!parsed.ok) return { success: false, error: parsed.error }
+    const input = parsed.data
+
+    const term = await db.term.findUnique({ where: { id: input.termId }, include: { academicYear: true } })
     if (!term) return { success: false, error: 'Term not found.' }
 
     await db.reportCard.upsert({
-      where: { studentId_termId: { studentId, termId } },
+      where: { studentId_termId: { studentId: input.studentId, termId: input.termId } },
       create: {
-        studentId,
-        termId,
+        studentId: input.studentId,
+        termId: input.termId,
         academicYear: term.academicYear.year,
-        comments: data.comments ?? null,
-        teacherNotes: data.teacherNotes ?? null,
-        principalNotes: data.principalNotes ?? null,
+        comments: input.comments,
+        teacherNotes: input.teacherNotes,
+        principalNotes: input.principalNotes,
       },
       update: {
-        comments: data.comments ?? null,
-        teacherNotes: data.teacherNotes ?? null,
-        principalNotes: data.principalNotes ?? null,
+        comments: input.comments,
+        teacherNotes: input.teacherNotes,
+        principalNotes: input.principalNotes,
       },
     })
 

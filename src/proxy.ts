@@ -16,6 +16,8 @@ const PUBLIC_PATHS = [
   '/api/calendar/feed',
   // Stripe calls this without a session. The route verifies the webhook signature itself.
   '/api/stripe/webhook',
+  // Docker and compose health checks call this without a session. It returns no data.
+  '/api/health',
 ]
 
 /** Matches the path exactly or as a whole segment prefix: '/login' and '/login/x' match, '/loginfoo' does not. */
