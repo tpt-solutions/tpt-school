@@ -1,5 +1,7 @@
 import { requireRole } from '@/lib/auth'
 import { db } from '@/lib/db'
+import Link from 'next/link'
+import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ActionForm, Field, controlClass } from '@/components/ops/action-form'
 import { awardMeritAction, deleteMeritAwardAction } from './actions'
@@ -73,7 +75,12 @@ export default async function MeritPage() {
         <CardHeader><CardTitle className="text-base">Award merit points</CardTitle></CardHeader>
         <CardContent>
           {students.length === 0 ? (
-            <p className="text-sm text-slate-500">No students are available to award.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-500">No students are available to award.</p>
+              <Link href="/students/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                Add a student
+              </Link>
+            </div>
           ) : (
             <ActionForm action={awardMeritAction} submitLabel="Award points">
               <Field label="Student *" htmlFor="studentId">

@@ -168,7 +168,12 @@ export default async function AttendanceReportPage({
 
       {/* Table */}
       {studentStats.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">No students found for the selected filters.</div>
+        <div className="text-center py-16 text-slate-400">
+          <p>No students found for the selected filters.</p>
+          <Link href="/reports/attendance" className="mt-3 inline-block text-sm text-slate-600 underline hover:text-slate-900">
+            Clear filters
+          </Link>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-100">
           <table className="w-full text-sm table-stack">

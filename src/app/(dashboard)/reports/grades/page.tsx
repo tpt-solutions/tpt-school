@@ -156,7 +156,10 @@ export default async function GradesReportPage({
       {/* Table */}
       {rows.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
-          No grade data found for the selected filters.
+          <p>No grade data found for the selected filters.</p>
+          <Link href="/reports/grades" className="mt-3 inline-block text-sm text-slate-600 underline hover:text-slate-900">
+            Clear filters
+          </Link>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-100">

@@ -117,7 +117,10 @@ export default async function ReportCardsPage({
       {/* Student list */}
       {students.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
-          No active students found.
+          <p>No active students found.</p>
+          <Link href="/reports/report-cards" className="mt-3 inline-block text-sm text-slate-600 underline hover:text-slate-900">
+            Clear filters
+          </Link>
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">

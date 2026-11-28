@@ -248,6 +248,9 @@ export default async function AttendanceReportPage({ searchParams }: PageProps) 
         {records.length === 0 ? (
           <div className="text-center py-12 text-slate-400">
             <p>No attendance records found for the selected filters</p>
+            <Link href="/attendance/report" className="mt-3 inline-block text-sm text-slate-600 underline hover:text-slate-900">
+              Clear filters
+            </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
