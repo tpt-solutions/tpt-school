@@ -86,6 +86,7 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Invoices',     href: '/portal/invoices',  icon: Receipt },
     { label: 'Calendar',     href: '/calendar',         icon: CalendarDays },
     { label: 'Notices',      href: '/portal/notices',   icon: Bell },
+    { label: 'Interviews',   href: '/portal/interviews', icon: MessagesSquare },
   ],
   student: [
     { label: 'Dashboard',     href: '/dashboard',       icon: LayoutDashboard },
