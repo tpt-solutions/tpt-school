@@ -46,5 +46,10 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      - name: Create database schema
+        # Pages are prerendered during `next build` and query the database, so the
+        # schema must exist. dev.db is git-ignored, so CI starts with an empty file.
+        run: npx prisma migrate deploy
+
       - name: Build
         run: npm run build
