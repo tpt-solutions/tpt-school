@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import CsvImportTable, { CsvRow } from '@/components/csv-import-table'
+import CsvExamplePreview from '@/components/csv-example-preview'
 import { importStudentsAction, ImportStudentRow } from './actions'
 import { Download, Upload } from 'lucide-react'
 
@@ -127,6 +128,10 @@ export default function StudentImportClient() {
             <Download className="w-4 h-4" />
             Download blank template with example rows
           </a>
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-slate-600">Example</p>
+            <CsvExamplePreview href="/templates/students-template.csv" />
+          </div>
         </CardContent>
       </Card>
 
